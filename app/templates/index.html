@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astro Pi Camera</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Astro Pi Camera</h1>
+    <nav>
+      <a href="{{ url_for('gallery') }}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="13" height="13" rx="2"></rect>
+          <path d="M8 21h11a2 2 0 0 0 2-2V8"></path>
+        </svg>
+        Gallery
+      </a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <h2>Focus / framing</h2>
+    <div class="preview-wrap">
+      <img id="preview" class="preview-stream" alt="live preview" hidden>
+      <div id="preview-placeholder" class="preview-placeholder">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="7" width="18" height="13" rx="2"></rect>
+          <path d="M8 7l1.4-2.5h5.2L16 7"></path>
+          <circle cx="12" cy="13.5" r="3.2"></circle>
+          <line x1="2" y1="2" x2="22" y2="22"></line>
+        </svg>
+        <span id="preview-placeholder-text">Preview unavailable</span>
+      </div>
+      <div id="crosshair" class="crosshair" hidden>
+        <span class="crosshair-h"></span>
+        <span class="crosshair-v"></span>
+      </div>
+    </div>
+
+    <label class="checkbox"><input type="checkbox" id="crosshair-toggle"> Show center crosshair</label>
+
+    <label>Zoom: <span id="zoom-value">1.0x</span>
+      <input type="range" id="zoom-slider" min="{{ min_zoom }}" max="{{ max_zoom }}" step="0.5" value="1">
+    </label>
+    <p class="hint">Zoom crops the sensor itself (not just the preview image) for real extra detail on a small star — useful for picking out a Bahtinov mask's diffraction spikes. Preview only; captures always use the full frame.</p>
+
+    <p class="hint">Live preview — pauses automatically while a sequence is running.</p>
+  </section>
+
+  <section class="card">
+    <h2>Capture sequence</h2>
+    <form id="start-form" action="{{ url_for('start_session') }}" method="post">
+      <label>Session
+        <select name="session_choice" id="session-select">
+          <option value="__new__" selected>New session</option>
+          {% for s in existing_sessions %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Session name
+        <input type="text" name="session_name" id="session-name-input"
+               value="{{ default_session_name }}" maxlength="100"
+               pattern="[A-Za-z0-9][A-Za-z0-9 _-]{0,99}"
+               title="Letters, numbers, spaces, hyphens or underscores only">
+        <span id="session-name-warning" class="hint warning" hidden>A session with this name already exists.</span>
+      </label>
+      <label>Exposure (seconds)
+        <input type="number" step="any" min="0.0001" max="200" name="exposure" value="{{ defaults.exposure }}">
+      </label>
+      <label>ISO
+        <select name="iso" id="iso-select">
+          {% for iso in iso_options %}
+            <option value="{{ iso }}" {% if iso == defaults.iso %}selected{% endif %}>{{ "Auto" if iso == "auto" else iso }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Number of shots
+        <input type="number" step="1" min="1" max="1000" name="count" value="{{ defaults.count }}">
+      </label>
+      <label>Interval between shots (seconds)
+        <input type="number" step="0.1" min="0" name="interval" value="{{ defaults.interval }}">
+      </label>
+      <label class="checkbox"><input type="checkbox" name="raw"> Also save raw DNG</label>
+      <button type="submit">Start sequence</button>
+    </form>
+    <form id="stop-form" action="{{ url_for('stop_session') }}" method="post">
+      <button type="submit">Stop</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Status</h2>
+    <div id="status">Loading...</div>
+  </section>
+
+  <script>
+    const previewImg = document.getElementById("preview");
+    const previewPlaceholder = document.getElementById("preview-placeholder");
+    const previewPlaceholderText = document.getElementById("preview-placeholder-text");
+    const isoSelect = document.getElementById("iso-select");
+    const zoomSlider = document.getElementById("zoom-slider");
+    const zoomValueLabel = document.getElementById("zoom-value");
+    const crosshairToggle = document.getElementById("crosshair-toggle");
+    const crosshairEl = document.getElementById("crosshair");
+    let previewRetryTimer = null;
+    let sessionRunning = false;
+
+    crosshairToggle.addEventListener("change", () => {
+      crosshairEl.hidden = !crosshairToggle.checked;
+    });
+
+    zoomSlider.addEventListener("input", () => {
+      zoomValueLabel.textContent = parseFloat(zoomSlider.value).toFixed(1) + "x";
+    });
+    // Reconnect only once the user releases the slider (not on every tick)
+    // — each reconnect means a full camera reconfigure, which is too slow
+    // to do continuously while dragging.
+    zoomSlider.addEventListener("change", reconnectPreview);
+
+    const sessionSelect = document.getElementById("session-select");
+    const sessionNameInput = document.getElementById("session-name-input");
+    const sessionNameWarning = document.getElementById("session-name-warning");
+    const defaultSessionName = sessionNameInput.value;
+    const existingSessionNames = new Set(
+      Array.from(sessionSelect.options).map((o) => o.value).filter((v) => v !== "__new__")
+    );
+
+    function validateSessionName() {
+      if (sessionSelect.value !== "__new__") {
+        sessionNameWarning.hidden = true;
+        return;
+      }
+      sessionNameWarning.hidden = !existingSessionNames.has(sessionNameInput.value.trim());
+    }
+
+    // Picking an existing session appends to it, so lock the name field to
+    // that session's name instead of letting it imply a rename. Picking
+    // "New session" restores the editable default name.
+    sessionSelect.addEventListener("change", () => {
+      if (sessionSelect.value === "__new__") {
+        sessionNameInput.value = defaultSessionName;
+        sessionNameInput.readOnly = false;
+      } else {
+        sessionNameInput.value = sessionSelect.value;
+        sessionNameInput.readOnly = true;
+      }
+      validateSessionName();
+    });
+    sessionNameInput.addEventListener("input", validateSessionName);
+
+    function showPreviewImage() {
+      previewPlaceholder.hidden = true;
+      previewImg.hidden = false;
+    }
+
+    function showPreviewPlaceholder() {
+      previewPlaceholderText.textContent = sessionRunning
+        ? "Capturing — preview paused"
+        : "Preview unavailable";
+      previewImg.hidden = true;
+      previewPlaceholder.hidden = false;
+    }
+
+    function reconnectPreview() {
+      // Chrome (unlike Firefox) never fires 'load' for a continuous
+      // multipart/x-mixed-replace stream — it only fires once the whole
+      // HTTP response finishes, which never happens for an open-ended MJPEG
+      // feed. Relying on 'load' to reveal the <img> left it permanently
+      // hidden behind the placeholder there. So show it optimistically the
+      // moment we attempt a connection, and only fall back to the
+      // placeholder if 'error' actually fires.
+      showPreviewImage();
+      const iso = encodeURIComponent(isoSelect.value);
+      const zoom = encodeURIComponent(zoomSlider.value);
+      previewImg.src = "{{ url_for('preview_stream') }}?iso=" + iso + "&zoom=" + zoom + "&t=" + Date.now();
+    }
+
+    // Live preview should match whatever ISO the user is about to shoot at.
+    isoSelect.addEventListener("change", reconnectPreview);
+
+    previewImg.addEventListener("load", showPreviewImage);
+
+    // The stream returns 503 while a sequence is running; show a clear
+    // placeholder instead of a broken-image icon, and back off and retry
+    // rather than leaving it stuck.
+    previewImg.addEventListener("error", () => {
+      showPreviewPlaceholder();
+      if (previewRetryTimer) return;
+      previewRetryTimer = setTimeout(() => {
+        previewRetryTimer = null;
+        reconnectPreview();
+      }, 2000);
+    });
+
+    showPreviewPlaceholder();
+    reconnectPreview();
+
+    let wasRunning = false;
+    async function refreshStatus() {
+      const res = await fetch("{{ url_for('session_status') }}");
+      const data = await res.json();
+      sessionRunning = !!data.running;
+      const el = document.getElementById("status");
+      if (!data.running && data.completed === undefined) {
+        el.textContent = "Idle.";
+      } else {
+        let text = data.running
+          ? `Running: ${data.completed}/${data.total} shots captured`
+          : `Finished: ${data.completed}/${data.total} shots captured`;
+        if (data.session_dir) text += ` (session: ${data.session_dir})`;
+        if (data.last_file) text += ` — last: ${data.last_file}`;
+        if (data.error) text += ` — error: ${data.error}`;
+        el.textContent = text;
+      }
+      // Sequence just finished: the live preview stopped itself for the
+      // duration, so reconnect it now that the camera is free again.
+      if (wasRunning && !data.running) {
+        reconnectPreview();
+      }
+      wasRunning = sessionRunning;
+    }
+    setInterval(refreshStatus, 2000);
+    refreshStatus();
+  </script>
+</body>
+</html>

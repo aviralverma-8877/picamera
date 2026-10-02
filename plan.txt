@@ -1,0 +1,6 @@
+- I have a raspberry pi zero 2 w, with Pi HQ camera attached.
+- This camera has IR cut filter removed, so it can capture in Infrared, which is best to capture nebulas.
+- I want to create a astromony camera using Pi zero 2 w, that will host a wifi AP, that allow users to use their phones to configure PI HQ Camera and take multiple exposures at regular interval.
+- We can use Python application to control every thing, from hosting and capturing.
+- Design a application that can run on Pi zero 2 w with above requirment.
+- For deployment and testing, the whole setup is hosted at 192.168.1.35 (user pi; password known locally, not recorded in this repo)

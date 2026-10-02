@@ -1,0 +1,3 @@
+- Keep documenting all the plans, progress and implementation under docs dir.
+- Keep testing the implementation on the test device hosted at 192.168.1.35 (user `pi`; password known locally, not recorded in this repo).
+- Keep checking the plan.txt for any new updates or implementation.

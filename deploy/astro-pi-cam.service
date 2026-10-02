@@ -1,0 +1,14 @@
+[Unit]
+Description=Astro Pi Camera Control App
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/astro-pi-cam/app
+ExecStart=/usr/bin/python3 /home/pi/astro-pi-cam/app/app.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
