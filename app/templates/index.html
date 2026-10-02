@@ -10,6 +10,11 @@
   <header>
     <h1>Astro Pi Camera</h1>
     <nav>
+      <label class="network-toggle" id="network-toggle-wrap" title="Checking network mode...">
+        <span id="network-toggle-label" class="network-toggle-text">···</span>
+        <input type="checkbox" id="network-toggle-checkbox">
+        <span class="network-toggle-track"><span class="network-toggle-thumb"></span></span>
+      </label>
       <a href="{{ url_for('gallery') }}">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="13" height="13" rx="2"></rect>
@@ -94,17 +99,6 @@
   <section class="card">
     <h2>Status</h2>
     <div id="status">Loading...</div>
-  </section>
-
-  <section class="card">
-    <h2>Network</h2>
-    <div id="network-status">Checking...</div>
-    <form id="network-toggle-form" action="{{ url_for('network_toggle') }}" method="post">
-      <button type="submit" id="network-toggle-btn" class="danger">Switch</button>
-    </form>
-    <p class="hint">Switching network mode drops your current connection to
-      the camera. Switching to home WiFi falls back to the AstroCamera AP
-      automatically if the home network can't actually be reached.</p>
   </section>
 
   <script>
@@ -236,36 +230,42 @@
     setInterval(refreshStatus, 2000);
     refreshStatus();
 
-    const networkStatusEl = document.getElementById("network-status");
-    const networkToggleBtn = document.getElementById("network-toggle-btn");
-    const networkToggleForm = document.getElementById("network-toggle-form");
-    let currentNetworkMode = null;
+    const networkToggleWrap = document.getElementById("network-toggle-wrap");
+    const networkToggleLabel = document.getElementById("network-toggle-label");
+    const networkToggleCheckbox = document.getElementById("network-toggle-checkbox");
+    let networkToggleBusy = false;
 
-    async function refreshNetworkStatus() {
-      try {
-        const res = await fetch("{{ url_for('network_status') }}");
-        const data = await res.json();
-        currentNetworkMode = data.mode;
-        if (data.mode === "ap") {
-          networkStatusEl.textContent = "Hosting AstroCamera AP (open WiFi)";
-          networkToggleBtn.textContent = "Switch to home WiFi";
-        } else if (data.mode === "sta") {
-          networkStatusEl.textContent = `Connected to "${data.connection}"`;
-          networkToggleBtn.textContent = "Switch to AP mode";
-        } else if (data.mode === "disconnected") {
-          networkStatusEl.textContent = "wlan0 not connected";
-          networkToggleBtn.textContent = "Switch to AP mode";
-        } else {
-          networkStatusEl.textContent = "Status unavailable";
-          networkToggleBtn.textContent = "Switch";
-        }
-      } catch (e) {
-        networkStatusEl.textContent = "Status unavailable";
+    function applyNetworkStatus(mode, connection) {
+      networkToggleCheckbox.checked = mode === "ap";
+      if (mode === "ap") {
+        networkToggleLabel.textContent = "AP";
+        networkToggleWrap.title = "Hosting AstroCamera AP — tap to switch to home WiFi";
+      } else if (mode === "sta") {
+        networkToggleLabel.textContent = "WiFi";
+        networkToggleWrap.title = `Connected to "${connection}" — tap to switch to AP mode`;
+      } else if (mode === "disconnected") {
+        networkToggleLabel.textContent = "—";
+        networkToggleWrap.title = "wlan0 not connected — tap to switch to AP mode";
+      } else {
+        networkToggleLabel.textContent = "?";
+        networkToggleWrap.title = "Network status unavailable";
       }
     }
 
-    networkToggleForm.addEventListener("submit", (e) => {
-      const switchingToAp = currentNetworkMode !== "ap";
+    async function refreshNetworkStatus() {
+      if (networkToggleBusy) return;
+      try {
+        const res = await fetch("{{ url_for('network_status') }}");
+        const data = await res.json();
+        applyNetworkStatus(data.mode, data.connection);
+      } catch (e) {
+        networkToggleLabel.textContent = "?";
+        networkToggleWrap.title = "Network status unavailable";
+      }
+    }
+
+    networkToggleCheckbox.addEventListener("change", async () => {
+      const switchingToAp = networkToggleCheckbox.checked;
       const msg = switchingToAp
         ? "Switch to AP mode? This drops the current connection immediately. " +
           "Connect to WiFi \"AstroCamera\" (open, no password) afterward and " +
@@ -274,10 +274,21 @@
           "If the home network can't actually be reached, it automatically " +
           "falls back to the AstroCamera AP.";
       if (!confirm(msg)) {
-        e.preventDefault();
+        networkToggleCheckbox.checked = !switchingToAp;
         return;
       }
-      networkStatusEl.textContent = "Switching...";
+      networkToggleBusy = true;
+      networkToggleLabel.textContent = "···";
+      try {
+        await fetch("{{ url_for('network_toggle') }}", { method: "POST" });
+      } catch (e) {
+        // The connection may already be dropping as a result of the
+        // switch — that's expected, not a failure to report.
+      }
+      // Give the switch time to actually happen before polling resumes;
+      // if it drops this client's own connection, refreshNetworkStatus's
+      // fetch will just start failing, which is the expected outcome.
+      setTimeout(() => { networkToggleBusy = false; }, 8000);
     });
 
     setInterval(refreshNetworkStatus, 5000);

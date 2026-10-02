@@ -420,6 +420,31 @@ AP" requirement:
   This needs a hands-on test — click "Switch" from a phone connected to
   the camera, confirm it lands on the `AstroCamera` AP, then switch back.
 
+## 2026-10-02 — Network control moved into the nav bar as a toggle switch
+
+Replaced the standalone "Network" card (status line + "Switch" button)
+with a compact iOS-style toggle switch in the header nav, next to the
+Gallery link — same `/network/status`/`/network/toggle` endpoints, just a
+smaller, always-visible control instead of a dedicated section. Checked =
+AP mode, unchecked = WiFi/STA; the label next to it shows "AP", "WiFi", or
+"—"/"?" for disconnected/unknown. Same confirmation-before-switching
+behavior as before, now triggered on the checkbox's `change` event with
+`fetch()` instead of a form submit — reverts the checkbox back if the user
+cancels the confirm dialog. A `networkToggleBusy` flag pauses the 5s status
+poll for 8s after a switch so it doesn't fight with the user's own action
+(or, if the switch drops this client's connection, just starts failing
+silently, which is the expected outcome).
+
+### Verified live on 192.168.1.35
+
+- Old `<h2>Network</h2>` card and its elements confirmed gone from the
+  served HTML; new toggle markup confirmed present.
+- `/network/status` still responds correctly (unchanged backend route).
+- As before, did not trigger an actual `/network/toggle` POST from this
+  session — same reasoning (would drop the SSH connection used to verify
+  it). Full interactive test (tap the switch, confirm, watch it land on
+  the AP) still needs a hands-on check.
+
 ### Not yet done
 
 - Have not physically tested AP mode (`deploy/ap-mode.sh`) with a phone, or

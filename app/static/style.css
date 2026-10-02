@@ -27,6 +27,56 @@ header a {
   text-decoration: none;
 }
 header a svg { flex-shrink: 0; }
+nav { display: flex; align-items: center; gap: 1rem; }
+.network-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #9aa0a6;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+}
+.network-toggle-text { min-width: 1.6em; text-align: right; }
+.network-toggle input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.network-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  background: #333;
+  border-radius: 999px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.network-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #e8e8e8;
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+.network-toggle input:checked + .network-toggle-track {
+  background: #3a82f7;
+}
+.network-toggle input:checked + .network-toggle-track .network-toggle-thumb {
+  transform: translateX(16px);
+}
+.network-toggle input:focus-visible + .network-toggle-track {
+  outline: 2px solid #7fd1ff;
+  outline-offset: 2px;
+}
 .card {
   margin: 1rem;
   padding: 1rem;
