@@ -445,15 +445,42 @@ silently, which is the expected outcome).
   it). Full interactive test (tap the switch, confirm, watch it land on
   the AP) still needs a hands-on check.
 
+## 2026-10-02 — First real-world AP↔STA test; it worked, IP confusion diagnosed
+
+User did the first hands-on test of the nav-bar toggle: switched to AP
+successfully, then reported switching back to WiFi "didn't connect."
+
+Investigated via logs rather than guessing:
+`journalctl -t sudo` showed the full chain — `sta-mode.sh` triggered at
+21:41:29, `nmcli connection down AstroPiCamAP` and
+`nmcli connection up netplan-wlan0-TATA_3071` both completed cleanly, and
+the connection's own timestamp confirmed it was up at 21:41:32 — about 3
+seconds end to end, no errors. `/network/status` confirmed it was still
+correctly on `sta` mode/the home network at the time of investigation.
+
+**Actual cause**: not a reconnect failure — an address change. AP mode is
+always `10.42.0.1`; STA mode's IP is whatever DHCP assigns
+(`192.168.1.35` here). The WiFi itself reconnected in ~3s; the browser was
+just still pointed at the now-dead `10.42.0.1`.
+
+**Fix**: confirmed the Pi already runs `avahi-daemon` and answers to
+`http://raspberrypi-2w.local:5000` via mDNS — tested live, works. Updated
+the "switch to WiFi" confirmation dialog to mention this address
+explicitly, and added a "Reaching the camera" section to docs/setup.md
+explaining the IP-changes-with-mode behavior and recommending the mDNS
+hostname over raw IPs when unsure which mode is active. Also fixed a
+stale doc reference to the old "Network card" (now a nav-bar toggle, per
+the previous change).
+
 ### Not yet done
 
-- Have not physically tested AP mode (`deploy/ap-mode.sh`) with a phone, or
-  the new UI toggle / boot-time fallback — by design, since any of these
-  drop the SSH session used for development and need an on-site test with
-  physical access as the safety net. Needs an on-site test: run
-  `ap-mode.sh` (or click "Switch" in the UI), connect a phone to SSID
-  `AstroCamera` (open), browse to `http://10.42.0.1:5000`, run a sequence,
-  then `sta-mode.sh` (or "Switch" again) to come back for further dev.
+- AP↔STA toggle confirmed working on real hardware by the device owner
+  (see above) — AP mode, and switching back, both verified via logs.
+  Still untested: a capture sequence run *while* actually connected via
+  the AP (phone on `AstroCamera`, not just toggling modes from an
+  already-authenticated session), and the boot-time failover branch where
+  no known network is in range at all (only the "already connected, do
+  nothing" branch has been exercised).
 - No real-sky test yet — all captures above were indoor test shots to
   verify the pipeline, not actual astrophotography.
 - ST7789 display HAT is still out of scope (see architecture.md).

@@ -270,7 +270,9 @@
         ? "Switch to AP mode? This drops the current connection immediately. " +
           "Connect to WiFi \"AstroCamera\" (open, no password) afterward and " +
           "browse to http://10.42.0.1:5000."
-        : "Switch to home WiFi? This drops the current connection immediately. " +
+        : "Switch to home WiFi? This drops the current connection immediately " +
+          "— the camera's address changes too (it's no longer 10.42.0.1), so " +
+          "re-open this page at http://raspberrypi-2w.local:5000 afterward. " +
           "If the home network can't actually be reached, it automatically " +
           "falls back to the AstroCamera AP.";
       if (!confirm(msg)) {

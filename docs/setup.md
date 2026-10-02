@@ -1,7 +1,9 @@
 # Device setup (run once per device)
 
-Target: `192.168.1.35`, user `pi` (password known to the device owner —
-not recorded here since this doc is public).
+Target: `192.168.1.35` (or `http://raspberrypi-2w.local:5000` for the app
+— see "Reaching the camera" below, works regardless of IP/WiFi mode), user
+`pi` (password known to the device owner — not recorded here since this
+doc is public).
 
 ## 1. Install dependencies
 
@@ -70,16 +72,30 @@ decision is made once at boot. If the AP is already up and you bring the
 Pi back within range of the home network, it won't switch back on its own
 — run `deploy/sta-mode.sh` (or reboot) to reconnect for dev/SSH.
 
+## Reaching the camera: IP changes with the mode, mDNS doesn't
+
+In AP mode the camera is always `http://10.42.0.1:5000` (nmcli's shared-
+mode gateway). In STA/home-WiFi mode its IP is whatever DHCP hands out
+(`192.168.1.35` on this network, but that's not guaranteed forever). If
+you switch modes and the page just stops loading, it's very likely this —
+**not a failed WiFi reconnect** — you're still pointed at the old address.
+
+The device also answers to `http://raspberrypi-2w.local:5000` via mDNS
+(`avahi-daemon`), which resolves correctly in either mode. Prefer that
+over the raw IP when you're not sure which mode the Pi is currently in.
+
 ## Switching WiFi mode by hand
 
-**From the web UI**: the control page has a "Network" card showing the
-current mode and a "Switch" button. Clicking it is a full WiFi mode flip —
-it drops whatever connection you're using to reach the camera right then,
-so it asks for confirmation first with mode-specific wording. Switching to
-home WiFi automatically falls back to the AP if the home network turns out
-not to be reachable (`sta-mode.sh`'s built-in fallback — see below), so it
-can't strand the Pi with no network at all; switching *to* AP mode always
-succeeds (it's the Pi's own radio/profile, no external dependency).
+**From the web UI**: the control page has a small toggle switch in the
+nav bar (next to the Gallery link) showing the current mode ("WiFi"/"AP").
+Tapping it is a full WiFi mode flip — it drops whatever connection you're
+using to reach the camera right then, so it asks for confirmation first
+with mode-specific wording (which includes the address to use afterward).
+Switching to home WiFi automatically falls back to the AP if the home
+network turns out not to be reachable (`sta-mode.sh`'s built-in fallback —
+see below), so it can't strand the Pi with no network at all; switching
+*to* AP mode always succeeds (it's the Pi's own radio/profile, no external
+dependency).
 
 **From SSH** (same two scripts the UI button calls):
 
