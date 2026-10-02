@@ -521,10 +521,82 @@ join `AstroCamera` fresh (forget/rejoin if the phone cached it as "no
 internet" before this change) and see whether the sign-in prompt appears
 on its own.
 
+## 2026-10-03 — Diagnosed and fixed: AP-toggle could permanently stall the camera
+
+User reported two things after the captive-portal change: the sign-in
+prompt never appeared, and the preview was blank on AP mode. Investigated
+both via logs rather than guessing, and the preview one turned out to
+still be broken *right now*, in STA mode, well after the AP test ended.
+
+**Captive portal**: `journalctl` showed zero requests to any of the known
+probe paths during the test — not even failed ones. The phone's own
+request log started directly at `GET /`. This means the phone's OS skipped
+its connectivity check entirely, which happens for networks it's already
+cached a "trust"/"no internet" verdict for — this phone had joined this
+SSID for plain connectivity testing before the captive-portal config
+existed. Not a server bug; needs "Forget This Network" + rejoin to force a
+fresh check.
+
+**Preview blank — a real, serious bug**: the Flask access log showed the
+AP-connected phone's very first `GET /preview.mjpg` sitting silently
+unanswered for ~25 seconds after the page loaded, and tracing back
+further: the *dev browser that triggered the `/network/toggle`* had its
+own `/preview.mjpg` connection open at that exact moment. The instant AP
+mode activated, that connection's socket became unreachable, but
+`stream_mjpeg`'s write to it doesn't find out right away — a write to a
+half-open TCP connection can block for a long time before the OS gives up
+retransmitting. That write was happening *inside* `AstroCamera`'s lock
+(`with self._lock:`), so it blocked every other camera use — including the
+phone's own preview — until the OS eventually noticed.
+
+Confirmed this was **still live** when investigating (not just a historical
+log artifact): `curl --max-time 8 .../preview.mjpg` over the home network,
+well after the AP test had ended, returned nothing at all — 8s, zero
+bytes, no response. Restarting `astro-pi-cam.service` cleared it
+immediately (confirmed preview resumed at ~24fps right after), which
+unblocked the user, followed by the actual fix:
+
+- `capture_still`: `with self._lock:` → `self._lock.acquire(timeout=30)`,
+  raising a new `CameraBusyError` on timeout (30s is generous — a real
+  200s exposure legitimately holds the lock that long; this is a backstop
+  against something *else* being stuck, not a complaint about long shots).
+  `CaptureSession`'s existing generic exception handler already surfaces
+  this as a normal status error, no changes needed there.
+- `stream_mjpeg`: can't acquire its own lock early enough to matter — it's
+  a generator, and its body doesn't run until first iterated, by which
+  point Werkzeug has already committed to a 200 response. Split locking
+  out into `AstroCamera.acquire()`/`release()`, called eagerly in
+  `preview_stream()` *before* constructing the streaming `Response`, with
+  a 5s timeout — a busy camera now gets a clean synchronous 503 instead of
+  a silently hanging connection.
+- `/network/toggle` now proactively bumps the preview-generation counter
+  right before launching the switch script, so a still-responsive stream
+  (hasn't started blocking yet) self-evicts immediately rather than
+  relying on the write ever unblocking.
+
+### Verified live on 192.168.1.35
+
+- Reproduced the stuck state directly: `preview.mjpg` hung 8s with zero
+  response, confirming the bug was real and still active, not just
+  historical.
+- Service restart cleared it; confirmed with a fresh request (52-71 frames
+  over 3s, normal ~24fps).
+- Post-fix regression: preview streams normally, a real capture session
+  (ISO 100, 1s exposure) completes with no error.
+
+**Not yet verified**: the actual fix under the original failure
+condition — deliberately leaving a preview open on one client while
+triggering `/network/toggle` from it, confirming a second client gets
+either a fast connection or a clean 503 instead of a long hang. Needs
+another on-site AP test to confirm end to end.
+
 ### Not yet done
 
-- Whether the captive-portal popup actually fires on real phones (iOS,
-  Android, and/or Windows) — needs the on-site test described above.
+- Whether the fix above actually resolves blank-preview-on-AP under the
+  original conditions (preview left open across a mode switch) — needs a
+  repeat on-site test.
+- Whether the captive-portal popup fires after forgetting and rejoining
+  the network fresh (see above) — needs the on-site test described above.
 - AP↔STA toggle confirmed working on real hardware by the device owner
   (see above) — AP mode, and switching back, both verified via logs.
   Still untested: a capture sequence run *while* actually connected via

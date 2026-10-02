@@ -121,6 +121,30 @@ deploy/
   automatically once a running sequence finishes. Flask runs with
   `threaded=True` so this long-lived connection doesn't block status
   polling or other requests.
+- **The camera lock has a bounded wait, not an unconditional `with
+  self._lock:`** — found via a real bug: a WiFi mode switch orphans
+  whatever preview connection was open on the browser that triggered it
+  (its socket goes unreachable), and that generator's write to the now-dead
+  socket can block for a long time before the OS notices — tens of seconds
+  in the one case this was caught live, no hard upper bound in general.
+  With a blocking lock, that single orphaned connection stalled every
+  other camera use (new previews, new captures) until the OS gave up.
+  `capture_still` now does `self._lock.acquire(timeout=30)` (generous,
+  since a legitimate exposure can itself hold the lock for up to 200s —
+  this is a backstop against something *else* being stuck, not a
+  complaint about long shots) and raises `CameraBusyError` on timeout,
+  which `CaptureSession`'s existing exception handler already surfaces as
+  a normal status error. `stream_mjpeg` can't acquire its own lock early
+  enough to matter — it's a generator, and generator bodies don't execute
+  until first iterated, by which point Werkzeug has already committed to a
+  200 response — so locking is split out into `AstroCamera.acquire()`/
+  `release()`, called eagerly in the Flask route *before* constructing the
+  streaming `Response`; a 5s timeout there means a busy camera gets a
+  clean synchronous 503 instead of a silently hanging connection. The
+  `/network/toggle` route also now proactively bumps the preview
+  generation counter right before launching the switch script, so a
+  still-responsive stream self-evicts immediately rather than only
+  noticing after the fact.
 - **Raw DNG capture is optional per-session**: stacking software (Siril,
   DeepSkyStacker) wants raw frames, but DNGs are large (~18MB on imx477) and
   slower to write; JPEG-only is the default, raw is an opt-in checkbox.

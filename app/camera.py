@@ -14,6 +14,15 @@ log = logging.getLogger(__name__)
 PREVIEW_STREAM_SIZE = (480, 360)
 
 
+class CameraBusyError(Exception):
+    """Raised when the camera lock can't be acquired within a reasonable
+    time. The usual cause: a previous preview connection's underlying
+    socket went unreachable (e.g. a WiFi mode switch orphaned it) and is
+    stuck blocked writing to it — the OS can take a long time to notice a
+    half-open TCP connection is dead, and that write happening inside the
+    lock would otherwise block every other camera use indefinitely."""
+
+
 class _StreamingOutput(io.BufferedIOBase):
     """Holds the latest JPEG frame written by Picamera2's JpegEncoder."""
 
@@ -91,8 +100,16 @@ class AstroCamera:
         The sensor needs roughly one full exposure period after a control
         change before it produces a correctly-exposed frame, so we sleep
         for the exposure duration before reading it out.
+
+        Raises CameraBusyError if the camera lock isn't free within 30s —
+        generous, since a legitimate long exposure can itself hold it for
+        up to 200s and that's not "busy", just in progress; this is only
+        meant to eventually surface a clear error instead of hanging
+        forever if something else is stuck (see CameraBusyError).
         """
-        with self._lock:
+        if not self._lock.acquire(timeout=30):
+            raise CameraBusyError("camera is busy")
+        try:
             self._open()
             exposure_us = int(exposure_seconds * 1_000_000)
             try:
@@ -126,6 +143,8 @@ class AstroCamera:
             finally:
                 self._picam2.stop()
                 self._close()
+        finally:
+            self._lock.release()
 
     def _zoom_crop_rect(self, zoom):
         """A centered ScalerCrop rectangle for `zoom`x digital zoom.
@@ -143,8 +162,26 @@ class AstroCamera:
         crop_y = y + (h - crop_h) // 2
         return (crop_x, crop_y, crop_w, crop_h)
 
+    def acquire(self, timeout=5):
+        """Try to claim exclusive camera access within `timeout` seconds.
+        Returns True if acquired — caller must call `release()` once done
+        — or False if busy. Used by the preview route so it can return a
+        clean 503 synchronously instead of hanging, since `stream_mjpeg`
+        below is a generator and can't acquire the lock itself early
+        enough for that (a generator's body doesn't run until first
+        iterated, which happens after the route has already returned its
+        Response to the client)."""
+        return self._lock.acquire(timeout=timeout)
+
+    def release(self):
+        self._lock.release()
+
     def stream_mjpeg(self, should_stop, gain=None, zoom=1.0):
         """Yield MJPEG multipart frames for a live focusing preview.
+
+        Caller must already hold the camera lock (see `acquire`) and must
+        call `release()` once this generator is exhausted or closed — it
+        does not manage the lock itself (see `acquire` for why).
 
         `should_stop()` is polled between frames; once it returns True the
         stream stops itself and releases the camera, instead of holding the
@@ -163,31 +200,30 @@ class AstroCamera:
         see `_zoom_crop_rect`. Preview-only: capture_still always uses the
         full frame regardless of what the preview was zoomed to.
         """
-        with self._lock:
-            self._open()
-            output = _StreamingOutput()
-            try:
-                video_config = self._picam2.create_video_configuration(
-                    main={"size": PREVIEW_STREAM_SIZE}
+        self._open()
+        output = _StreamingOutput()
+        try:
+            video_config = self._picam2.create_video_configuration(
+                main={"size": PREVIEW_STREAM_SIZE}
+            )
+            self._picam2.configure(video_config)
+            controls = {"AeEnable": True, "AwbEnable": True}
+            if gain is not None:
+                controls["AnalogueGain"] = gain
+            if zoom and zoom > 1.0:
+                controls["ScalerCrop"] = self._zoom_crop_rect(zoom)
+            self._picam2.set_controls(controls)
+            self._picam2.start_recording(JpegEncoder(), FileOutput(output))
+            while not should_stop():
+                with output.condition:
+                    output.condition.wait(timeout=2)
+                    frame = output.frame
+                if frame is None:
+                    continue
+                yield (
+                    b"--FRAME\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
                 )
-                self._picam2.configure(video_config)
-                controls = {"AeEnable": True, "AwbEnable": True}
-                if gain is not None:
-                    controls["AnalogueGain"] = gain
-                if zoom and zoom > 1.0:
-                    controls["ScalerCrop"] = self._zoom_crop_rect(zoom)
-                self._picam2.set_controls(controls)
-                self._picam2.start_recording(JpegEncoder(), FileOutput(output))
-                while not should_stop():
-                    with output.condition:
-                        output.condition.wait(timeout=2)
-                        frame = output.frame
-                    if frame is None:
-                        continue
-                    yield (
-                        b"--FRAME\r\n"
-                        b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
-                    )
-            finally:
-                self._picam2.stop_recording()
-                self._close()
+        finally:
+            self._picam2.stop_recording()
+            self._close()

@@ -157,15 +157,26 @@ def preview_stream():
         return "Invalid ISO or zoom", 400
     zoom = _clamp(zoom, config.MIN_ZOOM, config.MAX_ZOOM)
 
+    # Acquired here (not inside the generator) so a busy camera gets a
+    # clean, synchronous 503 instead of a 200 that then silently hangs —
+    # stream_mjpeg's body, being a generator, wouldn't even start running
+    # until Werkzeug first iterates it, by which point the response status
+    # is already committed.
+    if not camera.acquire(timeout=5):
+        return "Camera busy, try again shortly", 503
+
     my_generation = _next_preview_generation()
 
     def should_stop():
         return _session_running() or _preview_generation != my_generation
 
-    return Response(
-        camera.stream_mjpeg(should_stop, gain=gain, zoom=zoom),
-        mimetype="multipart/x-mixed-replace; boundary=FRAME",
-    )
+    def generate():
+        try:
+            yield from camera.stream_mjpeg(should_stop, gain=gain, zoom=zoom)
+        finally:
+            camera.release()
+
+    return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=FRAME")
 
 
 @app.route("/gallery")
@@ -308,6 +319,16 @@ def network_status():
 @app.route("/network/toggle", methods=["POST"])
 def network_toggle():
     mode, _ = _wifi_mode()
+    # Whatever's viewing this page — quite possibly a live preview stream
+    # — is about to have its connection orphaned by the network change.
+    # Evicting it now (rather than waiting for it to notice on its own)
+    # keeps it from getting stuck writing to a socket that's about to
+    # become unreachable, which can block the camera lock for a long time
+    # (the OS can take a long time to notice a half-open TCP connection is
+    # dead). preview_stream()'s own 5s acquire timeout is the backstop for
+    # whatever this doesn't catch.
+    _next_preview_generation()
+
     # Going to STA has its own fallback built in (sta-mode.sh reverts to
     # the AP if the home network turns out not to be reachable), so this
     # is safe to trigger even speculatively.
