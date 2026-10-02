@@ -1,0 +1,30 @@
+#!/bin/sh
+# Runs as root after dpkg unpacks the package's files. Finishes the setup
+# that used to be a manual sequence of SSH steps (docs/setup.md) — app
+# dependencies are already pulled in via the package's own Depends by this
+# point, so this just wires up ownership, the AP, sudo, the captive-portal
+# DNS override, and the systemd services.
+set -e
+
+INSTALL_DIR=/home/pi/astro-pi-cam
+
+if id pi >/dev/null 2>&1; then
+    chown -R pi:pi "$INSTALL_DIR"
+fi
+chmod +x "$INSTALL_DIR"/deploy/*.sh
+
+mkdir -p "$INSTALL_DIR/app/captures"
+chown pi:pi "$INSTALL_DIR/app/captures" 2>/dev/null || true
+
+# Each of these is idempotent (safe to re-run on an upgrade/reinstall) and
+# individually documented/runnable by hand in docs/setup.md — reused here
+# rather than reimplemented, so there's one place that defines what the AP
+# profile, sudoers rule, and DNS override actually are.
+sh "$INSTALL_DIR/deploy/setup_ap_profile.sh"
+sh "$INSTALL_DIR/deploy/setup_sudoers.sh"
+sh "$INSTALL_DIR/deploy/setup_captive_portal.sh"
+
+systemctl daemon-reload
+systemctl enable --now astro-pi-wifi-failover.service astro-pi-cam.service
+
+exit 0

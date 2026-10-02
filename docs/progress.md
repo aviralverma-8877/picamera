@@ -590,6 +590,73 @@ triggering `/network/toggle` from it, confirming a second client gets
 either a fast connection or a clean 503 instead of a long hang. Needs
 another on-site AP test to confirm end to end.
 
+## 2026-10-03 — `.deb` packaging for fresh-device installs
+
+Added `packaging/` to replace the multi-step manual setup sequence with
+one installable package for a brand-new Pi Zero 2 W:
+
+- `packaging/build-deb.sh`: assembles `app/`+`deploy/` under
+  `home/pi/astro-pi-cam/`, the two systemd units at their final
+  `etc/systemd/system/` path (so dpkg tracks/removes them natively instead
+  of `postinst` copying them in by hand), and `DEBIAN/control` (version
+  substituted from the new `VERSION` file at repo root) into
+  `astro-pi-cam_<version>_all.deb` via `dpkg-deb --build`.
+- `packaging/control.in`: declares `Depends: python3-picamera2,
+  python3-flask, python3-pil, network-manager, dnsmasq-base,
+  avahi-daemon, sudo` — `apt install ./<file>.deb` resolves these
+  automatically on a system that doesn't have them yet.
+- `packaging/postinst`/`prerm`/`postrm`: **call the existing
+  `deploy/setup_ap_profile.sh`/`setup_sudoers.sh`/`setup_captive_portal.sh`
+  scripts** rather than reimplementing their logic — one definition of
+  each setup step, whether run by hand (docs/setup.md) or by the package.
+  `postrm` only touches network/privilege state on an explicit `purge`,
+  and never deletes captured photos even then.
+
+### Verified live on 192.168.1.35 (built and actually installed, not just read)
+
+- Pushed the source tree to a scratch location on the Pi, ran
+  `build-deb.sh` there (needs `dpkg-deb`, not available on the Windows
+  dev machine) — built cleanly.
+- `dpkg-deb --info`/`--contents` confirmed correct metadata and file
+  layout before installing anything.
+- `dpkg -i` over the **already-configured** live system (the closest
+  safe proxy for a fresh install, since wiping the device to test a
+  truly blank one isn't reasonable): clean install, zero errors. Exercised
+  every idempotent setup path for real — AP profile recreated (not
+  errored) since one already existed, sudoers rule re-validated and
+  reinstalled, captive-portal config reinstalled.
+- `dpkg -l` showed `ii` (correctly installed), both services `active` and
+  `enabled`.
+- **Confirmed existing captures survive a reinstall untouched** — three
+  prior test sessions' photos were still present and correctly owned
+  afterward.
+- Full functional pass post-install: `/`, `/gallery`, `/network/status`
+  all correct, real MJPEG preview streaming normally.
+
+### A real regression, caught and fixed before it shipped quietly
+
+The first post-install functional check found `/preview.mjpg` returning
+**zero bytes** — not a test artifact, confirmed by checking the Pi's own
+loopback directly. Traced to an ordering bug in the camera-lock fix from
+earlier today: `preview_stream()` was calling `camera.acquire(timeout=5)`
+*before* `_next_preview_generation()`, but the generation bump is the only
+thing that tells an existing stream to let go of the lock. With acquire
+going first, a new request would just wait out its own timeout for a lock
+that was never going to be released — and critically, the generation bump
+that *would* have released it never happened either, since it was
+sequenced after the now-failed acquire. The net effect: the very first
+preview connection after a restart would permanently wedge the camera,
+with every subsequent request 503'ing forever instead of recovering.
+
+Fixed by reordering: bump the generation first (cheap, unconditional),
+*then* attempt to acquire. Verified directly against the failure mode,
+not just by re-reading the diff: opened a long-lived preview connection,
+started a second one 1s later, and confirmed the second got a clean 200
+(not a 503 loop) while the first was cut off mid-stream — the exact
+eviction behavior that was broken. Rebuilt the `.deb` with the corrected
+source and reinstalled it; confirmed the installed `app.py` has the fixed
+ordering and a fresh restart serves preview normally.
+
 ### Not yet done
 
 - Whether the fix above actually resolves blank-preview-on-AP under the

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs as root before the package's files are removed.
+set -e
+
+systemctl stop astro-pi-cam.service 2>/dev/null || true
+systemctl stop astro-pi-wifi-failover.service 2>/dev/null || true
+systemctl disable astro-pi-cam.service 2>/dev/null || true
+systemctl disable astro-pi-wifi-failover.service 2>/dev/null || true
+
+exit 0

@@ -5,7 +5,37 @@ Target: `192.168.1.35` (or `http://raspberrypi-2w.local:5000` for the app
 `pi` (password known to the device owner — not recorded here since this
 doc is public).
 
-## 1. Install dependencies
+## Fresh install (recommended): one `.deb` package
+
+For a brand-new Pi Zero 2 W (stock Raspberry Pi OS image), everything below
+— dependencies, the app itself, the AP profile, the sudoers rule, the
+captive-portal DNS override, and both systemd services — is packaged into
+one `.deb`, built from `packaging/`:
+
+```sh
+# On a Debian/Raspberry Pi OS machine (needs dpkg-deb) -- the Pi itself is
+# the simplest choice, since it always has it. Not runnable on Windows
+# directly.
+sh packaging/build-deb.sh
+sudo apt install ./astro-pi-cam_1.0.0_all.deb
+```
+
+`apt install ./<file>.deb` (rather than plain `dpkg -i`) resolves and pulls
+in the `Depends:` packages automatically on a fresh system that doesn't
+have them yet. Safe to re-run on an already-set-up device too — every step
+it performs is the same idempotent script described in the manual sections
+below, just run automatically by the package's `postinst`. A capture
+directory already populated with photos is never touched, even on
+`apt purge`.
+
+See `packaging/build-deb.sh`, `packaging/postinst`/`prerm`/`postrm`, and
+`packaging/control.in` for exactly what it does; the sections below are the
+same steps spelled out individually — useful for understanding what's
+happening, or if you'd rather not build a package.
+
+## Manual setup, step by step (what the `.deb` automates)
+
+### 1. Install dependencies
 
 ```sh
 ssh pi@192.168.1.35
@@ -16,7 +46,7 @@ sh deploy/setup_pi.sh
 Installs via apt (not pip — see docs/architecture.md): `python3-picamera2`,
 `python3-flask`, `python3-pil`.
 
-## 2. Create the AP connection profile (inactive until you switch to it)
+### 2. Create the AP connection profile (inactive until you switch to it)
 
 ```sh
 sh deploy/setup_ap_profile.sh
@@ -26,7 +56,7 @@ Creates an nmcli connection `AstroPiCamAP` — SSID `AstroCamera`, **open,
 no password**, so a phone can join it with zero setup in the field. Does
 **not** activate it, so your SSH session stays up.
 
-## 2b. Let the app trigger WiFi mode switches from its own UI
+### 2b. Let the app trigger WiFi mode switches from its own UI
 
 ```sh
 sh deploy/setup_sudoers.sh
@@ -38,7 +68,7 @@ is what lets the "Switch" button on the web page (see below) flip WiFi mode
 without the app needing a stored root password. The rule is validated with
 `visudo -c` before being installed.
 
-## 2c. Make connecting to the AP pop up the dashboard automatically
+### 2c. Make connecting to the AP pop up the dashboard automatically
 
 ```sh
 sh deploy/setup_captive_portal.sh
@@ -54,7 +84,7 @@ this network" browser straight to the dashboard, like a hotel or café
 hotspot, instead of the user needing to know to open a browser themselves.
 Takes effect next time AP mode is (re)activated, not retroactively.
 
-## 3. Install the systemd services
+### 3. Install the systemd services
 
 ```sh
 sudo cp deploy/astro-pi-cam.service deploy/astro-pi-wifi-failover.service /etc/systemd/system/
@@ -122,10 +152,19 @@ sh deploy/sta-mode.sh   # back home: rejoins the home network (falls back to the
 
 ## Redeploying code after changes
 
-From the dev machine:
+Two ways, for two different situations:
 
-```sh
-ASTRO_PI_SSH_PASSWORD=<password> python deploy/deploy.py
-```
-
-Copies `app/` to the Pi and restarts the service.
+- **Fast iteration while developing** — copies `app/`/`deploy/` straight
+  into the already-set-up install and restarts the service; doesn't touch
+  the AP/sudoers/captive-portal setup, so it assumes that's already in
+  place:
+  ```sh
+  ASTRO_PI_SSH_PASSWORD=<password> python deploy/deploy.py
+  ```
+- **Provisioning a new/reset device, or a clean reproducible upgrade** —
+  rebuild and reinstall the `.deb` (bump the version in `VERSION` first for
+  a real release):
+  ```sh
+  sh packaging/build-deb.sh
+  sudo apt install ./astro-pi-cam_<version>_all.deb
+  ```

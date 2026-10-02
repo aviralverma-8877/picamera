@@ -157,6 +157,15 @@ def preview_stream():
         return "Invalid ISO or zoom", 400
     zoom = _clamp(zoom, config.MIN_ZOOM, config.MAX_ZOOM)
 
+    # Bump the generation *before* trying to acquire the lock: this is the
+    # only signal that tells a still-running old stream to let go (its
+    # should_stop() checks this counter). Acquiring first would be a
+    # deadlock in slow motion — a healthy old stream would never learn it
+    # should stop, since the thing that evicts it hadn't happened yet, so
+    # every new request would just time out waiting for a lock that was
+    # never going to be released.
+    my_generation = _next_preview_generation()
+
     # Acquired here (not inside the generator) so a busy camera gets a
     # clean, synchronous 503 instead of a 200 that then silently hangs —
     # stream_mjpeg's body, being a generator, wouldn't even start running
@@ -164,8 +173,6 @@ def preview_stream():
     # is already committed.
     if not camera.acquire(timeout=5):
         return "Camera busy, try again shortly", 503
-
-    my_generation = _next_preview_generation()
 
     def should_stop():
         return _session_running() or _preview_generation != my_generation

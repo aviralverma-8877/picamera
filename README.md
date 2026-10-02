@@ -39,24 +39,35 @@ exposure sequences through a small web UI.
 ## Project layout
 
 ```
-app/      Flask web app, Picamera2 capture logic, templates/static
-deploy/   systemd service, apt setup script, AP mode toggle scripts,
-          and deploy.py (pushes app/ to the Pi over SFTP and restarts it)
-docs/     architecture.md (design + rationale), setup.md (device setup
-          steps), progress.md (dated changelog of what's been built/tested)
+app/        Flask web app, Picamera2 capture logic, templates/static
+deploy/     systemd services, apt/AP/sudoers/captive-portal setup scripts,
+            and deploy.py (pushes app/ to the Pi over SFTP and restarts it)
+packaging/  builds astro-pi-cam_<version>_all.deb — everything above,
+            bundled into one installable package for a fresh device
+docs/       architecture.md (design + rationale), setup.md (device setup
+            steps), progress.md (dated changelog of what's been built/tested)
 ```
 
 ## Setup
 
-See [`docs/setup.md`](docs/setup.md) for installing dependencies on the
-device, creating the WiFi AP profile, and installing the systemd service.
-See [`docs/architecture.md`](docs/architecture.md) for how it's built and
-why.
+**Fresh Pi Zero 2 W**: build and install the `.deb` — see
+[`docs/setup.md`](docs/setup.md#fresh-install-recommended-one-deb-package)
+for the two commands. Handles dependencies, the app, the AP profile, the
+sudoers rule, the captive-portal DNS override, and both systemd services in
+one step.
 
-## Deploying
+For the manual, step-by-step version of the same setup (useful for
+understanding what's happening, or tweaking a single piece), or for how
+WiFi mode selection and the captive portal work, see
+[`docs/setup.md`](docs/setup.md). See [`docs/architecture.md`](docs/architecture.md)
+for how it's all built and why.
+
+## Deploying code changes to an already-set-up device
 
 ```sh
 ASTRO_PI_SSH_PASSWORD=<password> python deploy/deploy.py
 ```
 
-Copies `app/` and `deploy/` to the Pi over SFTP and restarts the service.
+Copies `app/` and `deploy/` to the Pi over SFTP and restarts the service —
+the fast path while iterating. For provisioning a new device, use the
+`.deb` above instead.

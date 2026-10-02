@@ -1,0 +1,22 @@
+#!/bin/sh
+# Runs as root after the package's files are removed. dpkg already removes
+# the systemd unit files it shipped directly (/etc/systemd/system/*) on
+# its own; this only handles the things postinst created outside of
+# dpkg's own file tracking (the nmcli profile, sudoers rule, DNS config).
+set -e
+
+case "$1" in
+    purge)
+        # Only on an explicit purge, not a plain remove — this is
+        # network/privilege state, not something a reinstall should have
+        # to recreate from scratch. Captured photos under
+        # /home/pi/astro-pi-cam/app/captures are deliberately left alone
+        # even here: purging the package must never delete a user's images.
+        rm -f /etc/sudoers.d/astro-pi-network
+        rm -f /etc/NetworkManager/dnsmasq-shared.d/captive-portal.conf
+        nmcli connection delete AstroPiCamAP >/dev/null 2>&1 || true
+        ;;
+esac
+
+systemctl daemon-reload 2>/dev/null || true
+exit 0

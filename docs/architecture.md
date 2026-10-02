@@ -29,10 +29,22 @@ app/
   static/style.css    mobile-first styling
 
 deploy/
-  astro-pi-cam.service     systemd unit, runs app.py on boot
-  setup_pi.sh              one-time: apt install picamera2/flask/pillow
-  setup_ap_profile.sh      one-time: create (inactive) nmcli AP connection
-  ap-mode.sh / sta-mode.sh  toggle wlan0 between field AP and home STA
+  astro-pi-cam.service          systemd unit, runs app.py
+  astro-pi-wifi-failover.service systemd unit, boot-time AP/STA selection
+  setup_pi.sh                   one-time: apt install picamera2/flask/pillow
+  setup_ap_profile.sh           one-time: create (inactive) nmcli AP connection
+  setup_sudoers.sh              one-time: passwordless sudo for the two mode scripts
+  setup_captive_portal.sh       one-time: DNS wildcard redirect for AP clients
+  wifi-failover.sh              run by the failover service at boot
+  ap-mode.sh / sta-mode.sh      toggle wlan0 between field AP and home STA
+  deploy.py                     fast dev-iteration push (SFTP app/+deploy/, restart)
+
+packaging/
+  build-deb.sh    assembles astro-pi-cam_<version>_all.deb from the repo
+  control.in      package metadata + Depends (version substituted at build time)
+  postinst/prerm/postrm  maintainer scripts — run the deploy/setup_*.sh scripts
+                         above, so there's one definition of each setup step
+                         whether it's run by hand or by the package
 ```
 
 ## Why these choices
@@ -45,6 +57,23 @@ deploy/
   system libcamera build apt ships; pip wheels would fight that. Flask/Pillow
   are available via apt too, so the whole app runs on system Python with no
   venv to manage on a constrained device.
+- **A real `.deb` for fresh installs, not just a pile of setup scripts**:
+  `packaging/build-deb.sh` assembles the whole app, both systemd units, and
+  the three `deploy/setup_*.sh` scripts into one package whose
+  `Depends:` (`python3-picamera2`, `python3-flask`, `python3-pil`,
+  `network-manager`, `dnsmasq-base`, `avahi-daemon`, `sudo`) pulls in
+  everything apt needs to, and whose `postinst` runs those same setup
+  scripts rather than reimplementing their logic — one definition of "what
+  the AP profile/sudoers rule/DNS override are" regardless of whether
+  they're applied by hand or by the package. Verified by actually building
+  and `dpkg -i`-installing it on the real device (not just reading the
+  spec): confirmed a clean install with no errors, the AP/sudoers/DNS setup
+  correctly idempotent on reinstall (recreates the AP connection rather
+  than erroring on an existing one), both services active and enabled
+  afterward, and — importantly — a capture directory already full of
+  photos surviving the reinstall untouched. `postrm` only removes the
+  network/privilege state on an explicit `apt purge`, and even then never
+  touches captured images.
 - **nmcli hotspot, not hostapd+dnsmasq**: NetworkManager already owns wlan0
   on this image; a hand-rolled hostapd/dnsmasq setup would fight NM for the
   interface. `nmcli` has native AP support that NM manages directly.
