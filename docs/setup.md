@@ -38,6 +38,22 @@ is what lets the "Switch" button on the web page (see below) flip WiFi mode
 without the app needing a stored root password. The rule is validated with
 `visudo -c` before being installed.
 
+## 2c. Make connecting to the AP pop up the dashboard automatically
+
+```sh
+sh deploy/setup_captive_portal.sh
+```
+
+Installs a DNS wildcard redirect for AP-mode clients (every hostname they
+look up resolves to the Pi — harmless, since the AP has no upstream
+internet anyway) in `/etc/NetworkManager/dnsmasq-shared.d/`, the config
+directory NetworkManager's shared-mode dnsmasq already reads. Paired with
+captive-portal-probe routes in `app.py`, this is what makes joining
+`AstroCamera` behave like public WiFi — the phone pops its own "sign in to
+this network" browser straight to the dashboard, like a hotel or café
+hotspot, instead of the user needing to know to open a browser themselves.
+Takes effect next time AP mode is (re)activated, not retroactively.
+
 ## 3. Install the systemd services
 
 ```sh

@@ -325,6 +325,41 @@ def network_toggle():
     return jsonify({"switching_to": "sta" if mode == "ap" else "ap"})
 
 
+# Captive-portal detection, paired with the DNS wildcard redirect in
+# deploy/setup_captive_portal.sh (every hostname a client looks up while on
+# the AstroCamera AP resolves to this Pi — harmless, since that AP has no
+# upstream internet anyway). iOS, Android, and Windows each dial a specific
+# URL right after joining a network to decide whether it's a plain
+# connection or a captive portal; each one expects an exact "yes, you have
+# real internet" response (Apple wants a literal "Success" page, Android
+# wants a bare 204, Windows wants the text "Microsoft Connect Test").
+# Answering with a redirect instead — to any of them, regardless of what
+# hostname they actually dialed, since DNS sends them all here — is what
+# makes the OS treat the network as a captive portal and pop up a browser
+# pointed straight at the redirect target, landing the user on the
+# dashboard without them needing to know to open one themselves.
+@app.route("/hotspot-detect.html")  # Apple
+@app.route("/library/test/success.html")  # Apple (older)
+@app.route("/generate_204")  # Android
+@app.route("/gen_204")  # Android (older)
+@app.route("/connecttest.txt")  # Windows
+@app.route("/ncsi.txt")  # Windows
+@app.route("/success.txt")  # Firefox
+def captive_portal_probe():
+    return redirect(url_for("index"), code=302)
+
+
+# Catch-all: anything else an OS or app probes for while DNS is pointed
+# here (not every connectivity check uses one of the well-known paths
+# above) also lands on the dashboard instead of a bare 404. Flask/Werkzeug
+# prefers more specific routes over this for any URL that matches one
+# (e.g. /gallery, /captures/<session>/<file>), so it only ever catches
+# paths nothing else claimed.
+@app.route("/<path:_unused>")
+def catch_all(_unused):
+    return redirect(url_for("index"), code=302)
+
+
 if __name__ == "__main__":
     # threaded=True so the long-lived MJPEG preview connection doesn't
     # block status polling / session start / gallery requests.

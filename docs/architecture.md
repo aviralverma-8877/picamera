@@ -87,6 +87,27 @@ deploy/
   `deploy/sta-mode.sh` (or a reboot) reconnects it for dev/SSH. The manual
   `deploy/ap-mode.sh`/`sta-mode.sh` toggle scripts still exist for
   switching without a reboot.
+- **Joining the AP behaves like public WiFi (captive-portal-style)**: two
+  halves. `deploy/setup_captive_portal.sh` drops a wildcard DNS override
+  (`address=/#/10.42.0.1`) into `/etc/NetworkManager/dnsmasq-shared.d/` —
+  NetworkManager's own config-include directory for the internal dnsmasq
+  it runs whenever a connection is in shared (AP) mode, confirmed present
+  on-device pre-created by the NM package. This sends every hostname an
+  AP-mode client looks up to the Pi itself, which is free of any real
+  tradeoff since that AP has no upstream internet to begin with. On the
+  app side, `captive_portal_probe()` in `app.py` answers each major OS's
+  own connectivity-check URL (Apple's `/hotspot-detect.html`, Android's
+  `/generate_204`, Windows' `/connecttest.txt`, etc. — DNS sends all of
+  them here regardless of which hostname they were dialed against) with a
+  302 instead of the exact "yes, you have real internet" response each OS
+  expects; that mismatch is exactly what makes the OS conclude there's a
+  captive portal and open a browser straight to the redirect target. A
+  catch-all route (`catch_all`, registered last) extends the same
+  treatment to any other unrecognized path, since not every OS/background
+  request uses one of the well-known probe URLs; Werkzeug's routing
+  always prefers a more specific match over it, so it never shadows a real
+  route. Takes effect next time AP mode activates, not retroactively on an
+  already-running hotspot.
 - **Small live MJPEG preview, not a click-to-refresh shot**: `/preview.mjpg`
   streams continuous low-res (480x360) auto-exposure JPEG frames via
   Picamera2's `JpegEncoder`, shown small (240px wide) on the control page so

@@ -22,8 +22,12 @@ exposure sequences through a small web UI.
   session as a zip, delete a frame/session/everything.
 - **Automatic WiFi mode at boot** — joins a known network (e.g. home WiFi)
   if one's in range, otherwise hosts its own open `AstroCamera` AP so a
-  phone can connect in the field with zero setup. A "Network" card in the
-  UI also lets you flip modes by hand at any time.
+  phone can connect in the field with zero setup. A toggle switch in the
+  nav bar also lets you flip modes by hand at any time.
+- **Connects like public WiFi** — joining the `AstroCamera` AP pops up a
+  "sign in to this network" prompt straight to the dashboard, the same way
+  a hotel or café hotspot does, instead of needing to know to open a
+  browser and type an address.
 
 ## Hardware
 

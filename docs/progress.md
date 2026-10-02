@@ -472,8 +472,59 @@ hostname over raw IPs when unsure which mode is active. Also fixed a
 stale doc reference to the old "Network card" (now a nav-bar toggle, per
 the previous change).
 
+## 2026-10-02 — Captive-portal-style onboarding for the AP
+
+Joining `AstroCamera` should feel like joining public WiFi — phone pops up
+a "sign in to this network" prompt straight to the dashboard, no need to
+know to open a browser and type an address.
+
+Two halves, verified for real NetworkManager/dnsmasq support before
+writing any code (checked `/etc/NetworkManager/dnsmasq-shared.d/` already
+exists on-device, pre-created by the NM package — confirms it's an
+actively supported hook, not a guess):
+
+- **`deploy/setup_captive_portal.sh`**: drops
+  `address=/#/10.42.0.1` into that directory — wildcard DNS override so
+  every hostname an AP-mode client looks up resolves to the Pi. Validated
+  the exact config line with `dnsmasq --test` before installing
+  ("syntax check OK").
+- **`app.py`**: `captive_portal_probe()` answers each OS's own
+  connectivity-check URL (Apple `/hotspot-detect.html`, Android
+  `/generate_204`, Windows `/connecttest.txt`, Firefox `/success.txt`,
+  plus older variants) with a 302 to `/` instead of the exact "you have
+  real internet" response each one expects — that mismatch is what makes
+  the OS treat it as a captive portal and open a browser to the redirect
+  target. A catch-all route extends this to any other unrecognized path.
+
+### Verified live on 192.168.1.35
+
+- `dnsmasq --test --conf-file=...` with the exact redirect line → "syntax
+  check OK".
+- All 7 named probe paths → HTTP 302, `Location: /`.
+- Catch-all on an arbitrary nonsense path → HTTP 302, `Location: /`.
+- **Regression check on the catch-all** (the risky part — a bare
+  `/<path:_unused>` route could in principle shadow real routes): `/`,
+  `/gallery`, `/session/status`, `/network/status`, `/static/style.css`,
+  a real `/captures/<session>/<file>.jpg`, and `/gallery/<session>/download`
+  all still returned 200 — confirmed Werkzeug's more-specific-route-wins
+  behavior holds here, not just assumed from how routing is documented to
+  work.
+- DNS config file installed and confirmed present with the right content.
+
+**Deliberately not tested**: whether a phone's OS actually pops the
+captive-portal browser automatically on joining — that's a physical,
+on-device OS behavior (iOS/Android/Windows network-join heuristics), not
+something an HTTP client or this remote session can trigger or observe.
+The config only takes effect the next time AP mode activates, not
+retroactively on an already-running hotspot either. Needs an on-site test:
+join `AstroCamera` fresh (forget/rejoin if the phone cached it as "no
+internet" before this change) and see whether the sign-in prompt appears
+on its own.
+
 ### Not yet done
 
+- Whether the captive-portal popup actually fires on real phones (iOS,
+  Android, and/or Windows) — needs the on-site test described above.
 - AP↔STA toggle confirmed working on real hardware by the device owner
   (see above) — AP mode, and switching back, both verified via logs.
   Still untested: a capture sequence run *while* actually connected via
