@@ -53,3 +53,12 @@ def parse_iso(value):
 # upscaling/interpolating rather than delivering more real detail.
 MIN_ZOOM = 1.0
 MAX_ZOOM = 8.0
+
+# nmcli connection name for the field AP, and the scripts that switch
+# wlan0 into/out of it — see deploy/setup_ap_profile.sh and
+# deploy/setup_sudoers.sh (grants the app passwordless sudo for exactly
+# these two scripts, nothing else).
+AP_CONNECTION_NAME = "AstroPiCamAP"
+DEPLOY_DIR = APP_DIR.parent / "deploy"
+AP_MODE_SCRIPT = DEPLOY_DIR / "ap-mode.sh"
+STA_MODE_SCRIPT = DEPLOY_DIR / "sta-mode.sh"

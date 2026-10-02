@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import threading
 import zipfile
@@ -269,6 +270,59 @@ def delete_all():
         if d.is_dir():
             shutil.rmtree(d)
     return redirect(url_for("gallery"))
+
+
+def _wifi_mode():
+    """Returns (mode, connection_name) for wlan0: mode is 'ap', 'sta', or
+    'disconnected' ('unknown' if nmcli couldn't be queried)."""
+    try:
+        out = subprocess.run(
+            ["nmcli", "-t", "-f", "DEVICE,CONNECTION", "device", "status"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout
+    except Exception:
+        log.exception("Failed to query nmcli device status")
+        return "unknown", None
+
+    for line in out.splitlines():
+        parts = line.split(":")
+        if len(parts) >= 2 and parts[0] == "wlan0":
+            conn = parts[1]
+            if conn == config.AP_CONNECTION_NAME:
+                return "ap", conn
+            if conn and conn != "--":
+                return "sta", conn
+            return "disconnected", None
+    return "unknown", None
+
+
+@app.route("/network/status")
+def network_status():
+    mode, conn = _wifi_mode()
+    return jsonify({"mode": mode, "connection": conn})
+
+
+@app.route("/network/toggle", methods=["POST"])
+def network_toggle():
+    mode, _ = _wifi_mode()
+    # Going to STA has its own fallback built in (sta-mode.sh reverts to
+    # the AP if the home network turns out not to be reachable), so this
+    # is safe to trigger even speculatively.
+    script = config.STA_MODE_SCRIPT if mode == "ap" else config.AP_MODE_SCRIPT
+    try:
+        # Fire-and-forget: this request may be arriving over the very
+        # connection the script is about to tear down, so we don't wait
+        # for it to finish — just launch it and return immediately, giving
+        # the client the best chance of seeing a response before the
+        # network actually changes.
+        subprocess.Popen(["sudo", "-n", str(script)])
+    except Exception as exc:
+        log.exception("Failed to launch network mode switch")
+        return f"Failed to switch network mode: {exc}", 500
+    return jsonify({"switching_to": "sta" if mode == "ap" else "ap"})
 
 
 if __name__ == "__main__":

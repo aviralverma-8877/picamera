@@ -48,10 +48,45 @@ deploy/
 - **nmcli hotspot, not hostapd+dnsmasq**: NetworkManager already owns wlan0
   on this image; a hand-rolled hostapd/dnsmasq setup would fight NM for the
   interface. `nmcli` has native AP support that NM manages directly.
-- **Manual AP/STA toggle scripts, not automatic switching from the app**:
-  flipping wlan0 out of STA mode drops the SSH session used for dev/testing.
-  The app never touches network mode itself; switching to AP mode is a
-  deliberate step taken when the device is physically deployed.
+- **WiFi mode is chosen automatically at boot**: `astro-pi-wifi-failover.
+  service` runs `deploy/wifi-failover.sh` once per boot, before
+  `astro-pi-cam.service` starts. It leans entirely on NetworkManager's own
+  autoconnect for the "at home" case (the home network profile already has
+  `autoconnect: yes` — no code needed) and only adds the missing piece: if
+  wlan0 isn't connected to a real network within 25s, it brings up the open
+  `AstroCamera` AP (`AstroPiCamAP` connection, no password —
+  `deploy/setup_ap_profile.sh` creates it the same way) itself.
+- **...with a manual override from the web UI, not automatic switching
+  while running**: the "Network" card's Switch button calls
+  `/network/toggle`, which shells out to the same `ap-mode.sh`/
+  `sta-mode.sh` scripts used for manual SSH switching — one source of
+  truth for the actual nmcli commands either way. The Flask process itself
+  (`User=pi`) has no privilege to change network state; a narrowly-scoped
+  sudoers.d rule (`deploy/setup_sudoers.sh`) grants passwordless `sudo` for
+  exactly those two script paths and nothing else, rather than running the
+  whole app as root or storing a root password in it. The toggle route
+  launches the script with `subprocess.Popen` (fire-and-forget) instead of
+  waiting for it to finish, since the HTTP request triggering it may be
+  arriving over the very connection the script is about to tear down.
+  Switching *to* STA reuses `sta-mode.sh`'s built-in AP fallback (below),
+  so clicking it can never strand the Pi with no network; switching to AP
+  always succeeds (it's the Pi's own radio and profile, no external
+  dependency to fail).
+- **`sta-mode.sh` falls back to the AP if the home network isn't actually
+  reachable**: whether triggered by hand, by reboot-time failover, or from
+  the UI, "go to STA" wouldn't be safe to assume always succeeds — the Pi
+  might not really be home, the router might be off, etc. So it waits up
+  to 15s after bringing the home connection up, and if wlan0 still isn't
+  actually connected to it, brings the AP back up instead of leaving the
+  Pi with no network until a reboot.
+- **The boot-time decision doesn't continuously re-evaluate** — a direct
+  consequence of the single-WiFi-radio constraint above: once the radio is
+  busy hosting the AP, it can't simultaneously scan for the home network in
+  the background. So if the Pi boots in the field (AP active) and is later
+  brought back within range of home WiFi, it won't switch back on its own;
+  `deploy/sta-mode.sh` (or a reboot) reconnects it for dev/SSH. The manual
+  `deploy/ap-mode.sh`/`sta-mode.sh` toggle scripts still exist for
+  switching without a reboot.
 - **Small live MJPEG preview, not a click-to-refresh shot**: `/preview.mjpg`
   streams continuous low-res (480x360) auto-exposure JPEG frames via
   Picamera2's `JpegEncoder`, shown small (240px wide) on the control page so

@@ -369,13 +369,66 @@ diffraction pattern clearly, added:
 - Confirmed the crosshair div and zoom slider (with server-rendered
   min="1.0"/max="8.0") are present in the served HTML.
 
+## 2026-10-02 — Automatic WiFi mode at boot + manual toggle in the UI
+
+Implements the "at home use home WiFi, in the field host the camera's own
+AP" requirement:
+
+- **AP reconfigured**: `AstroPiCamAP` is now SSID `AstroCamera`, fully
+  open (no password) — recreated from scratch (delete + re-add) rather
+  than modified in place, since nmcli has no clean one-liner to strip a
+  wireless-security setting back off a connection that already has one.
+  Verified live: `nmcli connection show AstroPiCamAP` has zero
+  `wireless-security.*` lines.
+- **Boot-time failover** (`deploy/wifi-failover.sh` +
+  `astro-pi-wifi-failover.service`, oneshot, before `astro-pi-cam.service`):
+  leans on NetworkManager's own autoconnect for known networks (no code
+  needed — the home profile already has `autoconnect: yes`) and only adds
+  the fallback: if wlan0 isn't connected to anything real within 25s, bring
+  up the AP. Verified live: ran the script directly while already on the
+  home network — it correctly detected that and exited without touching
+  anything ("wlan0 connected to 'netplan-wlan0-TATA_3071' - staying on
+  this network").
+- **`sta-mode.sh` now falls back to the AP** if the home network can't
+  actually be reached (waits up to 15s, checks, falls back) — the
+  "Pi came back to AP" behavior explicitly requested, so neither the
+  boot-time path nor a manual/UI-triggered switch to STA can strand the
+  device with no network until a reboot.
+- **Manual toggle in the web UI**: a "Network" card showing live status
+  (polled via new `/network/status`) and a "Switch" button
+  (`/network/toggle`) with mode-specific confirmation wording, since
+  flipping modes drops whatever connection is viewing the page right then.
+  The always-on Flask process (runs as `pi`, no root) can't change network
+  state itself; `deploy/setup_sudoers.sh` installs a sudoers.d rule
+  (validated with `visudo -c`) granting passwordless `sudo` for exactly
+  `ap-mode.sh`/`sta-mode.sh` — nothing else — so no root password needs to
+  live in the app. The toggle route launches the script with
+  `subprocess.Popen` (not a blocking call) since the request triggering it
+  may be arriving over the very connection about to be torn down.
+
+### Verified live on 192.168.1.35
+
+- `GET /network/status` → correctly reported
+  `{"mode":"sta","connection":"netplan-wlan0-TATA_3071"}`.
+- `sudo -l` as the `pi` user confirmed passwordless access to exactly
+  `/home/pi/astro-pi-cam/deploy/ap-mode.sh` and `.../sta-mode.sh` — the
+  same absolute paths `config.AP_MODE_SCRIPT`/`STA_MODE_SCRIPT` resolve to.
+- **Deliberately not tested**: actually POSTing `/network/toggle`, or
+  running `ap-mode.sh`/`sta-mode.sh` for real. Doing so from this session
+  would drop the very SSH connection (over the home network) being used to
+  verify it, with no physical access to recover if anything went wrong.
+  This needs a hands-on test — click "Switch" from a phone connected to
+  the camera, confirm it lands on the `AstroCamera` AP, then switch back.
+
 ### Not yet done
 
-- Have not physically tested AP mode (`deploy/ap-mode.sh`) with a phone — by
-  design, since activating it drops the SSH session used for development.
-  Needs an on-site test: run `ap-mode.sh`, connect a phone to SSID
-  `AstroPiCam`, browse to `http://10.42.0.1:5000`, run a sequence, then
-  `sta-mode.sh` to come back for further dev.
+- Have not physically tested AP mode (`deploy/ap-mode.sh`) with a phone, or
+  the new UI toggle / boot-time fallback — by design, since any of these
+  drop the SSH session used for development and need an on-site test with
+  physical access as the safety net. Needs an on-site test: run
+  `ap-mode.sh` (or click "Switch" in the UI), connect a phone to SSID
+  `AstroCamera` (open), browse to `http://10.42.0.1:5000`, run a sequence,
+  then `sta-mode.sh` (or "Switch" again) to come back for further dev.
 - No real-sky test yet — all captures above were indoor test shots to
   verify the pipeline, not actual astrophotography.
 - ST7789 display HAT is still out of scope (see architecture.md).

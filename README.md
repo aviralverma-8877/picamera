@@ -20,8 +20,10 @@ exposure sequences through a small web UI.
   in Siril / DeepSkyStacker / etc.
 - **Gallery** — browse captures, download individual frames or a whole
   session as a zip, delete a frame/session/everything.
-- **Standalone in the field** — hosts its own WiFi AP (`nmcli`); switches
-  back to the home network only for development.
+- **Automatic WiFi mode at boot** — joins a known network (e.g. home WiFi)
+  if one's in range, otherwise hosts its own open `AstroCamera` AP so a
+  phone can connect in the field with zero setup. A "Network" card in the
+  UI also lets you flip modes by hand at any time.
 
 ## Hardware
 

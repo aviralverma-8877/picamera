@@ -96,6 +96,17 @@
     <div id="status">Loading...</div>
   </section>
 
+  <section class="card">
+    <h2>Network</h2>
+    <div id="network-status">Checking...</div>
+    <form id="network-toggle-form" action="{{ url_for('network_toggle') }}" method="post">
+      <button type="submit" id="network-toggle-btn" class="danger">Switch</button>
+    </form>
+    <p class="hint">Switching network mode drops your current connection to
+      the camera. Switching to home WiFi falls back to the AstroCamera AP
+      automatically if the home network can't actually be reached.</p>
+  </section>
+
   <script>
     const previewImg = document.getElementById("preview");
     const previewPlaceholder = document.getElementById("preview-placeholder");
@@ -224,6 +235,53 @@
     }
     setInterval(refreshStatus, 2000);
     refreshStatus();
+
+    const networkStatusEl = document.getElementById("network-status");
+    const networkToggleBtn = document.getElementById("network-toggle-btn");
+    const networkToggleForm = document.getElementById("network-toggle-form");
+    let currentNetworkMode = null;
+
+    async function refreshNetworkStatus() {
+      try {
+        const res = await fetch("{{ url_for('network_status') }}");
+        const data = await res.json();
+        currentNetworkMode = data.mode;
+        if (data.mode === "ap") {
+          networkStatusEl.textContent = "Hosting AstroCamera AP (open WiFi)";
+          networkToggleBtn.textContent = "Switch to home WiFi";
+        } else if (data.mode === "sta") {
+          networkStatusEl.textContent = `Connected to "${data.connection}"`;
+          networkToggleBtn.textContent = "Switch to AP mode";
+        } else if (data.mode === "disconnected") {
+          networkStatusEl.textContent = "wlan0 not connected";
+          networkToggleBtn.textContent = "Switch to AP mode";
+        } else {
+          networkStatusEl.textContent = "Status unavailable";
+          networkToggleBtn.textContent = "Switch";
+        }
+      } catch (e) {
+        networkStatusEl.textContent = "Status unavailable";
+      }
+    }
+
+    networkToggleForm.addEventListener("submit", (e) => {
+      const switchingToAp = currentNetworkMode !== "ap";
+      const msg = switchingToAp
+        ? "Switch to AP mode? This drops the current connection immediately. " +
+          "Connect to WiFi \"AstroCamera\" (open, no password) afterward and " +
+          "browse to http://10.42.0.1:5000."
+        : "Switch to home WiFi? This drops the current connection immediately. " +
+          "If the home network can't actually be reached, it automatically " +
+          "falls back to the AstroCamera AP.";
+      if (!confirm(msg)) {
+        e.preventDefault();
+        return;
+      }
+      networkStatusEl.textContent = "Switching...";
+    });
+
+    setInterval(refreshNetworkStatus, 5000);
+    refreshNetworkStatus();
   </script>
 </body>
 </html>

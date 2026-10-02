@@ -1,0 +1,13 @@
+[Unit]
+Description=Astro Pi Camera WiFi mode selection (known network, else AP fallback)
+After=NetworkManager.service network.target
+Wants=NetworkManager-wait-online.service
+Before=astro-pi-cam.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/pi/astro-pi-cam/deploy/wifi-failover.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

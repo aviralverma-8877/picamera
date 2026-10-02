@@ -1,6 +1,6 @@
 [Unit]
 Description=Astro Pi Camera Control App
-After=network.target
+After=network.target astro-pi-wifi-failover.service
 
 [Service]
 Type=simple
