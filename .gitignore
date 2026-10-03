@@ -5,3 +5,4 @@ app/captures/
 *.dng
 .DS_Store
 Thumbs.db
+*.deb
