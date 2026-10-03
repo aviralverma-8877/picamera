@@ -719,6 +719,29 @@ Pi's loopback — 62 frames, and an extracted frame showed a real scene.
 Stream was healthy; the black box was the client side (likely a stale
 connection from before a service restart).
 
+## 2026-10-03 — First GitHub release: v1.0.0
+
+https://github.com/aviralverma-8877/picamera/releases/tag/v1.0.0 — tag
+on `14bc5f3`, with `astro-pi-cam_1.0.0_all.deb` attached.
+
+- Built the package on the Pi from the committed source, then
+  `dpkg -i`'d that exact file: clean install, both services active,
+  preview streaming, dashboard 200.
+- Installed `gh` (winget, v2.102.0) and logged in via the browser
+  device-code flow. First `gh release create` was rejected (HTTP 422):
+  `--target` needs the full commit SHA, not a short one. Retried with the
+  full SHA after confirming it matched `origin/main`.
+- Downloaded the published asset back from GitHub and compared SHA-256
+  with the tested build: identical
+  (`a0703fecab6f9075f057b4f51bafcdee3f8822f99e9867bffcce5cd99edf9e2a`).
+- `*.deb` added to `.gitignore`; release packages live on GitHub releases,
+  not in the repo. Local and Pi-side build copies deleted.
+- README now installs from the release download instead of a local build.
+
+For future releases: bump `VERSION`, rebuild with
+`packaging/build-deb.sh`, test-install, then
+`gh release create v<version> <file>.deb --target <full sha>`.
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the

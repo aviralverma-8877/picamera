@@ -50,11 +50,18 @@ docs/       architecture.md (design + rationale), setup.md (device setup
 
 ## Setup
 
-**Fresh Pi Zero 2 W**: build and install the `.deb` — see
-[`docs/setup.md`](docs/setup.md#fresh-install-recommended-one-deb-package)
-for the two commands. Handles dependencies, the app, the AP profile, the
-sudoers rule, the captive-portal DNS override, and both systemd services in
-one step.
+**Fresh Pi Zero 2 W**: install the `.deb` from the
+[latest release](https://github.com/aviralverma-8877/picamera/releases/latest):
+
+```sh
+wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.0/astro-pi-cam_1.0.0_all.deb
+sudo apt install ./astro-pi-cam_1.0.0_all.deb
+```
+
+Handles dependencies, the app, the AP profile, the sudoers rule, the
+captive-portal DNS override, and both systemd services in one step. To
+build the package yourself from source instead, see
+[`docs/setup.md`](docs/setup.md#fresh-install-recommended-one-deb-package).
 
 For the manual, step-by-step version of the same setup (useful for
 understanding what's happening, or tweaking a single piece), or for how
