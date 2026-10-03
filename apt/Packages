@@ -23,3 +23,28 @@ Description: Standalone WiFi-AP astrophotography camera controller
  Assumes the standard Raspberry Pi OS "pi" user; installs the app under
  that user's home directory and runs it as that user.
 
+Package: astro-pi-cam
+Architecture: all
+Version: 1.0.3
+Priority: optional
+Section: misc
+Maintainer: Aviral Verma <aviral.verma.8877@gmail.com>
+Depends: python3-picamera2, python3-flask, python3-pil, network-manager, dnsmasq-base, avahi-daemon, sudo
+Filename: ./astro-pi-cam_1.0.3_all.deb
+Size: 25742
+MD5sum: 102473b3dba3c932d36dde779a30febc
+SHA1: 1fce3de59c4a89a6b6ef6194b36dedb10974945c
+SHA256: e2bd58a24da351cfde26c259975420f3e477d149d00ac1f32501559a04442f03
+SHA512: 6384f9a0bb153fa234055e51b7fe5dca04a4021b4d916eb4ffd58f6eaab12f7237cdf15312864142d94ec476f05104d0aae018d72908f00431238af783ad7124
+Homepage: https://github.com/aviralverma-8877/picamera
+Description: Standalone WiFi-AP astrophotography camera controller
+ Flask-based control app for a Raspberry Pi HQ Camera on a Pi Zero 2 W.
+ Hosts its own open WiFi access point in the field, with captive-portal
+ style onboarding, or joins a known network automatically at home.
+ Manual exposure/ISO capture sequences, named/appendable sessions, a
+ live focusing preview with digital zoom and center crosshair, raw DNG
+ capture, and a gallery with per-image/session download and delete.
+ .
+ Assumes the standard Raspberry Pi OS "pi" user; installs the app under
+ that user's home directory and runs it as that user.
+
