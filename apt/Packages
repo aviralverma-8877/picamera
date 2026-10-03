@@ -6,11 +6,11 @@ Section: misc
 Maintainer: Aviral Verma <aviral.verma.8877@gmail.com>
 Depends: python3-picamera2, python3-flask, python3-pil, network-manager, dnsmasq-base, avahi-daemon, sudo
 Filename: ./astro-pi-cam_1.0.2_all.deb
-Size: 24914
-MD5sum: 4e9482eedca05cda1325f67597ce9610
-SHA1: 46e07f2b7c72f094f61d3707027b04c791c083c3
-SHA256: 110ea1c39cfd19591992ecd488620f200a7ae487fd509eb28fad7e568b57c933
-SHA512: 5056ebef9374917d6b47fca9571eb40c6910c2dd3a97cc3716be8ca6e0a4939487bc5a81d3bb65736d616282399cbc901e63dab76c539ebbcfaf01b9cf05f7db
+Size: 25322
+MD5sum: 429cf6f713659562a1f2e201cd6047b8
+SHA1: 5ca693d6723e0e28ef14316f565767c7125a4475
+SHA256: c139a033e423554aed31b282ea796ae873ae13b305a21e96cdf3eea60ef37e3a
+SHA512: fed903a78399a8ab09500b1e470bd1d4266cba5c32ee29548b5c6063623b95f38a2a28394dc1ad6adcd45ae4633c1dd82131e7974825f29d5ceed14377356fc6
 Homepage: https://github.com/aviralverma-8877/picamera
 Description: Standalone WiFi-AP astrophotography camera controller
  Flask-based control app for a Raspberry Pi HQ Camera on a Pi Zero 2 W.
