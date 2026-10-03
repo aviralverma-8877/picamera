@@ -901,6 +901,30 @@ reload and restarts the preview when toggled.
 - Checkbox stays ticked after starting a sequence.
 - Test sessions deleted afterwards.
 
+## 2026-10-03 — v1.0.3 released (Rotate 180°); first real apt-to-apt upgrade
+
+Bumped `VERSION`, pushed tag `v1.0.3`; the release workflow built the
+package, created the release, and published it to the apt repository in
+one run. Release asset and apt repository serve the same file
+(SHA-256 `e2bd58a2…`). Release notes rewritten by hand afterwards.
+
+**Upgraded the test Pi from 1.0.2 to 1.0.3 purely through apt**
+(`apt-get update` + `apt-get install --only-upgrade astro-pi-cam`): candidate
+1.0.3 came from the GitHub Pages repository, the app restarted onto it,
+both services active, the Rotate 180° box and flipped preview work. This
+is the first upgrade between two published versions via the repository —
+exactly the path installed cameras will use.
+
+**Unexplained reboot during the release**: the first upgrade attempt lost
+its SSH session because the Pi rebooted (uptime 0 min, boot 07:56); the
+upgrade hadn't started and `dpkg --audit` was clean. The cause isn't
+recoverable — journald on this image is volatile, so the previous boot's
+logs are gone. Possible causes: the UI power menu, a power blip, or an
+undervoltage reset (common on a Zero 2 W with a weak supply). Worth
+enabling persistent journald (`/var/log/journal`) if this recurs. On the
+upside, the Pi rejoined the home network by itself after booting — the
+boot-time WiFi failover's "known network in range" branch, on a real boot.
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the
