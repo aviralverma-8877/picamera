@@ -54,8 +54,8 @@ docs/       architecture.md (design + rationale), setup.md (device setup
 [latest release](https://github.com/aviralverma-8877/picamera/releases/latest):
 
 ```sh
-wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.2/astro-pi-cam_1.0.2_all.deb
-sudo apt install ./astro-pi-cam_1.0.2_all.deb
+wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.3/astro-pi-cam_1.0.3_all.deb
+sudo apt install ./astro-pi-cam_1.0.3_all.deb
 ```
 
 Handles dependencies, the app, the AP profile, the sudoers rule, the
