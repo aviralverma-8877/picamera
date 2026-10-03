@@ -353,6 +353,32 @@ def network_toggle():
     return jsonify({"switching_to": "sta" if mode == "ap" else "ap"})
 
 
+def _power_action(systemctl_verb):
+    # Refused mid-capture rather than silently cutting a sequence short —
+    # a reboot/poweroff partway through a long exposure loses that frame
+    # and every one after it. The UI says so; this is the actual guard.
+    if _session_running():
+        return "A capture sequence is running — stop it first", 409
+    try:
+        # Fire-and-forget for the same reason as the network toggle: the
+        # machine is about to go away, so there's nothing to wait for.
+        subprocess.Popen(["sudo", "-n", "/usr/bin/systemctl", systemctl_verb])
+    except Exception as exc:
+        log.exception("Failed to launch systemctl %s", systemctl_verb)
+        return f"Failed to {systemctl_verb}: {exc}", 500
+    return jsonify({"ok": True, "action": systemctl_verb})
+
+
+@app.route("/system/reboot", methods=["POST"])
+def system_reboot():
+    return _power_action("reboot")
+
+
+@app.route("/system/shutdown", methods=["POST"])
+def system_shutdown():
+    return _power_action("poweroff")
+
+
 # Captive-portal detection, paired with the DNS wildcard redirect in
 # deploy/setup_captive_portal.sh (every hostname a client looks up while on
 # the AstroCamera AP resolves to this Pi — harmless, since that AP has no

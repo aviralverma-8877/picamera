@@ -22,8 +22,27 @@
         </svg>
         Gallery
       </a>
+      <details class="power-menu">
+        <summary aria-label="Power options" title="Reboot / shut down">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v9"></path>
+            <path d="M6.3 6.8a8 8 0 1 0 11.4 0"></path>
+          </svg>
+        </summary>
+        <div class="power-menu-items">
+          <button type="button" id="reboot-btn">Reboot</button>
+          <button type="button" id="shutdown-btn" class="danger">Shut down</button>
+        </div>
+      </details>
     </nav>
   </header>
+
+  <div id="power-overlay" class="power-overlay" hidden>
+    <div class="power-overlay-box">
+      <h2 id="power-overlay-title"></h2>
+      <p id="power-overlay-text"></p>
+    </div>
+  </div>
 
   <section class="card">
     <h2>Focus / framing</h2>
@@ -295,6 +314,83 @@
 
     setInterval(refreshNetworkStatus, 5000);
     refreshNetworkStatus();
+
+    const powerMenu = document.querySelector(".power-menu");
+    const powerOverlay = document.getElementById("power-overlay");
+    const powerOverlayTitle = document.getElementById("power-overlay-title");
+    const powerOverlayText = document.getElementById("power-overlay-text");
+
+    function showPowerOverlay(title, text) {
+      powerOverlayTitle.textContent = title;
+      powerOverlayText.textContent = text;
+      powerOverlay.hidden = false;
+    }
+
+    async function requestPowerAction(url) {
+      powerMenu.open = false;
+      try {
+        const res = await fetch(url, { method: "POST" });
+        if (!res.ok) {
+          alert(await res.text());
+          return false;
+        }
+        return true;
+      } catch (e) {
+        // The Pi may already be going down before the response arrives.
+        return true;
+      }
+    }
+
+    document.getElementById("reboot-btn").addEventListener("click", async () => {
+      if (sessionRunning) {
+        alert("A capture sequence is running. Stop it before rebooting — a reboot would end it partway through.");
+        return;
+      }
+      const ok = confirm(
+        "Reboot the camera?\n\n" +
+        "• It will be offline for about a minute.\n" +
+        "• WiFi mode is re-chosen at boot: it rejoins the home network if " +
+        "it's in range, otherwise it comes back up as the AstroCamera hotspot " +
+        "— in that case reconnect your phone to AstroCamera.\n" +
+        "• The live preview and this page will disconnect until it's back."
+      );
+      if (!ok || !(await requestPowerAction("{{ url_for('system_reboot') }}"))) return;
+
+      showPowerOverlay(
+        "Rebooting…",
+        "This page will reload by itself once the camera is back (about a minute). " +
+        "If it doesn't, the camera may have come back up as the AstroCamera hotspot — " +
+        "join that network and open http://10.42.0.1:5000."
+      );
+      // Wait out the shutdown half before polling, so an answer from the
+      // still-running old process isn't mistaken for "back up".
+      setTimeout(function poll() {
+        fetch("{{ url_for('network_status') }}", { cache: "no-store" })
+          .then((r) => { if (r.ok) location.reload(); else setTimeout(poll, 3000); })
+          .catch(() => setTimeout(poll, 3000));
+      }, 20000);
+    });
+
+    document.getElementById("shutdown-btn").addEventListener("click", async () => {
+      if (sessionRunning) {
+        alert("A capture sequence is running. Stop it before shutting down — shutting down would end it partway through.");
+        return;
+      }
+      const ok = confirm(
+        "Shut down the camera?\n\n" +
+        "• It can't be turned back on from this page — the Pi Zero 2 W has no " +
+        "power button. You'll need to unplug and re-plug its power to start it again.\n" +
+        "• Wait until the green activity light stops flashing (about 20 seconds) " +
+        "before unplugging, or the SD card can be corrupted."
+      );
+      if (!ok || !(await requestPowerAction("{{ url_for('system_shutdown') }}"))) return;
+
+      showPowerOverlay(
+        "Shutting down…",
+        "Wait until the green activity light on the Pi stops flashing (about 20 seconds) " +
+        "before unplugging it. To turn it back on, unplug and re-plug the power."
+      );
+    });
   </script>
 </body>
 </html>

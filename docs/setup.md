@@ -63,10 +63,12 @@ sh deploy/setup_sudoers.sh
 ```
 
 Installs a sudoers.d rule granting the `pi` user passwordless `sudo` for
-exactly `deploy/ap-mode.sh` and `deploy/sta-mode.sh` — nothing else. This
-is what lets the "Switch" button on the web page (see below) flip WiFi mode
-without the app needing a stored root password. The rule is validated with
-`visudo -c` before being installed.
+exactly `deploy/ap-mode.sh`, `deploy/sta-mode.sh`, `systemctl reboot`, and
+`systemctl poweroff` — nothing else (sudoers matches the arguments too, so
+this doesn't open up `systemctl` in general). This is what lets the web
+page's WiFi toggle and power menu (see below) work without the app needing
+a stored root password. The rule is validated with `visudo -c` before being
+installed.
 
 ### 2c. Make connecting to the AP pop up the dashboard automatically
 
@@ -149,6 +151,21 @@ dependency).
 sh deploy/ap-mode.sh    # go into the field: hosts "AstroCamera" AP, drops SSH over wlan0
 sh deploy/sta-mode.sh   # back home: rejoins the home network (falls back to the AP if it can't)
 ```
+
+## Rebooting / shutting down from the web UI
+
+The power icon at the right of the nav bar opens a Reboot / Shut down
+menu. Both are refused (server-side, not just in the UI) while a capture
+sequence is running — stop it first. Each asks for confirmation spelling
+out what happens:
+
+- **Reboot**: offline for about a minute; WiFi mode is re-chosen at boot
+  (home network if it's in range, otherwise the `AstroCamera` hotspot).
+  The page polls and reloads itself once the camera answers again.
+- **Shut down**: can't be undone from the page — the Pi Zero 2 W has no
+  power button, so it has to be unplugged and re-plugged to start again.
+  Wait until the green activity LED stops flashing (~20s) before
+  unplugging, or the SD card can be corrupted.
 
 ## Redeploying code after changes
 

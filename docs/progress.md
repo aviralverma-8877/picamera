@@ -657,8 +657,49 @@ eviction behavior that was broken. Rebuilt the `.deb` with the corrected
 source and reinstalled it; confirmed the installed `app.py` has the fixed
 ordering and a fresh restart serves preview normally.
 
+## 2026-10-03 — Reboot / shut down from the web UI
+
+Power icon in the nav bar opens a small `<details>` menu (no JS needed to
+open/close) with Reboot and Shut down. `POST /system/reboot` and
+`/system/shutdown` (`app.py: _power_action`) launch
+`sudo -n /usr/bin/systemctl reboot|poweroff` fire-and-forget, and refuse
+with 409 while a capture is running (a reboot mid-sequence would silently
+lose the rest of it). `deploy/setup_sudoers.sh` now grants NOPASSWD for
+exactly those two `systemctl` invocations in addition to the mode scripts
+— sudoers matches arguments, so `systemctl` in general stays
+password-protected. Since the package's `postinst` runs this same script,
+the `.deb` picks it up with no packaging changes.
+
+Confirmations spell out consequences: reboot = ~1 min offline and WiFi
+mode re-chosen at boot (may come back as the hotspot); shutdown = no way
+back from the page (Zero 2 W has no power button, must replug) and wait for
+the green LED to stop flashing before unplugging. After confirming, a
+full-page overlay says the same; for reboot the page waits 20s (so the
+still-dying old process isn't mistaken for "back"), then polls and reloads.
+
+### Verified live on 192.168.1.35
+
+- `sudo -n -l` as `pi`: the NOPASSWD set is exactly `ap-mode.sh`,
+  `sta-mode.sh`, `systemctl reboot`, `systemctl poweroff`. (A first attempt
+  at a negative control — `sudo -n -l /usr/bin/systemctl stop ssh` —
+  reported "allowed", but that was a flawed test: `pi` already has stock
+  password-protected full sudo, and `-l <cmd>` checks policy, not whether
+  a password is needed. Checked the NOPASSWD listing directly instead.)
+- Started a 6s capture, POSTed `/system/reboot` mid-exposure → 409 "A
+  capture sequence is running"; the capture then completed normally
+  (`completed: 1`, no error). Only tested the guard via the reboot route —
+  both routes share `_power_action`, and if the guard had been broken a
+  reboot recovers itself while a shutdown would need a physical replug.
+- Power menu, overlay, and both route URLs present in the served page.
+
+**Not tested**: an actual reboot or shutdown, or the reload-after-reboot
+polling — both would take the device offline from this session.
+
 ### Not yet done
 
+- An actual reboot via the UI (checks the reload polling and that the
+  device comes back), and an actual shutdown (needs someone at the device
+  to replug it).
 - Whether the fix above actually resolves blank-preview-on-AP under the
   original conditions (preview left open across a mode switch) — needs a
   repeat on-site test.

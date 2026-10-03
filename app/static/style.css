@@ -28,6 +28,53 @@ header a {
 }
 header a svg { flex-shrink: 0; }
 nav { display: flex; align-items: center; gap: 1rem; }
+.power-menu { position: relative; }
+.power-menu summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  color: #e67e73;
+  cursor: pointer;
+}
+.power-menu summary::-webkit-details-marker { display: none; }
+.power-menu-items {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.6rem);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  min-width: 140px;
+  background: #16181d;
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+.power-menu-items button {
+  margin-top: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+.power-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(11, 12, 16, 0.92);
+}
+.power-overlay-box {
+  max-width: 360px;
+  padding: 1.25rem;
+  background: #16181d;
+  border-radius: 8px;
+  text-align: center;
+}
+.power-overlay-box h2 { margin-top: 0; font-size: 1.1rem; }
+.power-overlay-box p { margin-bottom: 0; color: #9aa0a6; line-height: 1.45; }
 .network-toggle {
   display: inline-flex;
   align-items: center;
