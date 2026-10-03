@@ -1,0 +1,15 @@
+Date: Sat, 03 Oct 2026 01:53:17 +0000
+Label: Astro Pi Camera
+Origin: astro-pi-cam
+MD5Sum:
+ 5e8535dc5d308a06cfaa1df81ec9efa4             1269 Packages
+ 651eb7582383d70d624421dc9da82f64              847 Packages.gz
+SHA1:
+ f5d071b5b0b52cc998f500471de9c9e7ea568592             1269 Packages
+ 2122a4556bdedce4a592ac2561442f644969f59c              847 Packages.gz
+SHA256:
+ b87f5334ffe8ae58d9bfd52b22dc82928bbb399890d520239d1f1088a5f66061             1269 Packages
+ c35da14ce6233d80461b052b0c63dc343e657c878255696c34efec39dab3921c              847 Packages.gz
+SHA512:
+ 552588f9795b422e632044de651506d5674ab6d920d7bbe5cf099c83d8864269512435c2c3103df267578374bc003a957a34506bf6e2f0e2c32002e27c234d00             1269 Packages
+ c284672daf8252ba2f80cd890a9da2736f0a53555d387f7b3e5323fd084d99ff1aed0413d0d880b178efaaf4826bcbfa7dd9e475b06f100666139c581961f383              847 Packages.gz
