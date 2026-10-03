@@ -5,6 +5,9 @@ After=network.target astro-pi-wifi-failover.service
 [Service]
 Type=simple
 User=pi
+# Lets the unprivileged pi user bind port 80 (needed so phones'
+# captive-portal checks, which are plain http on port 80, reach the app).
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 WorkingDirectory=/home/pi/astro-pi-cam/app
 ExecStart=/usr/bin/python3 /home/pi/astro-pi-cam/app/app.py
 Restart=on-failure

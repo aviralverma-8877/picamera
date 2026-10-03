@@ -137,6 +137,20 @@ packaging/
   always prefers a more specific match over it, so it never shadows a real
   route. Takes effect next time AP mode activates, not retroactively on an
   already-running hotspot.
+- **The app listens on port 80, because the captive portal needs it**:
+  OS connectivity checks are plain `http://` on port 80. The app originally
+  ran on 5000, so on a real Android phone the probe reached the Pi (DNS
+  did its job) and was refused — and "connection refused" reads as "no
+  internet", not "captive portal", so no sign-in prompt ever appeared.
+  Every earlier test called the probe paths on `:5000`, which is why this
+  slipped through. The service still runs as `pi`, not root:
+  `AmbientCapabilities=CAP_NET_BIND_SERVICE` in the unit grants just the
+  right to bind ports below 1024. Probes arriving under a hijacked foreign
+  hostname (e.g. `connectivitycheck.gstatic.com`) get an absolute redirect
+  to `http://10.42.0.1/`, so the phone's sign-in window lands on the
+  camera's real address rather than on the borrowed hostname. Port 443 is
+  deliberately left closed: Android's parallel HTTPS probe then fails fast
+  and it trusts the HTTP probe's "portal" verdict.
 - **Small live MJPEG preview, not a click-to-refresh shot**: `/preview.mjpg`
   streams continuous low-res (480x360) auto-exposure JPEG frames via
   Picamera2's `JpegEncoder`, shown small (240px wide) on the control page so
@@ -195,7 +209,7 @@ packaging/
 
 ## Capture flow
 
-1. User opens `http://<ap-ip>:5000/` on their phone, picks a session (a
+1. User opens `http://<ap-ip>/` on their phone, picks a session (a
    growing dropdown of existing session folders, plus "New session"),
    names it if creating new (defaults to `<today>-<n>`, the nth new session
    created that day), and sets exposure (seconds), ISO, shot count, interval

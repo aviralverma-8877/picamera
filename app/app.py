@@ -400,7 +400,7 @@ def system_shutdown():
 @app.route("/ncsi.txt")  # Windows
 @app.route("/success.txt")  # Firefox
 def captive_portal_probe():
-    return redirect(url_for("index"), code=302)
+    return _redirect_to_dashboard()
 
 
 # Catch-all: anything else an OS or app probes for while DNS is pointed
@@ -411,10 +411,31 @@ def captive_portal_probe():
 # paths nothing else claimed.
 @app.route("/<path:_unused>")
 def catch_all(_unused):
+    return _redirect_to_dashboard()
+
+
+def _redirect_to_dashboard():
+    # A request addressed to some other site's hostname (e.g.
+    # connectivitycheck.gstatic.com) only reaches us because the AP's DNS
+    # hijack sent it here. A relative redirect would keep the phone's
+    # captive-portal window on that borrowed hostname, so send it to the
+    # AP's real address instead. Requests to our own names (IP, .local)
+    # stay relative, which also keeps this harmless on the home network.
+    host = request.host.split(":")[0]
+    is_ours = host.endswith(".local") or host.replace(".", "").isdigit()
+    if not is_ours:
+        return redirect(f"http://{config.AP_GATEWAY_IP}/", code=302)
     return redirect(url_for("index"), code=302)
 
 
 if __name__ == "__main__":
+    # Port 80, not a high port: phones' captive-portal checks are plain
+    # http:// on port 80, and if nothing answers there the OS concludes
+    # "no internet" rather than "captive portal" and never shows the
+    # sign-in prompt. The service runs as `pi`; binding a port below 1024
+    # comes from AmbientCapabilities=CAP_NET_BIND_SERVICE in the systemd
+    # unit, not from running as root.
+    #
     # threaded=True so the long-lived MJPEG preview connection doesn't
     # block status polling / session start / gallery requests.
-    app.run(host="0.0.0.0", port=5000, threaded=True)
+    app.run(host="0.0.0.0", port=config.HTTP_PORT, threaded=True)

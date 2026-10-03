@@ -59,6 +59,9 @@ MAX_ZOOM = 8.0
 # deploy/setup_sudoers.sh (grants the app passwordless sudo for exactly
 # these two scripts, nothing else).
 AP_CONNECTION_NAME = "AstroPiCamAP"
+# NetworkManager's fixed gateway address for a shared-mode (AP) connection.
+AP_GATEWAY_IP = "10.42.0.1"
+HTTP_PORT = 80
 DEPLOY_DIR = APP_DIR.parent / "deploy"
 AP_MODE_SCRIPT = DEPLOY_DIR / "ap-mode.sh"
 STA_MODE_SCRIPT = DEPLOY_DIR / "sta-mode.sh"

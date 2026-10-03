@@ -1,6 +1,6 @@
 # Device setup (run once per device)
 
-Target: `192.168.1.35` (or `http://raspberrypi-2w.local:5000` for the app
+Target: `192.168.1.35` (or `http://raspberrypi-2w.local` for the app
 — see "Reaching the camera" below, works regardless of IP/WiFi mode), user
 `pi` (password known to the device owner — not recorded here since this
 doc is public).
@@ -17,7 +17,7 @@ one `.deb`, built from `packaging/`:
 # the simplest choice, since it always has it. Not runnable on Windows
 # directly.
 sh packaging/build-deb.sh
-sudo apt install ./astro-pi-cam_1.0.0_all.deb
+sudo apt install ./astro-pi-cam_<version>_all.deb
 ```
 
 `apt install ./<file>.deb` (rather than plain `dpkg -i`) resolves and pulls
@@ -94,7 +94,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now astro-pi-wifi-failover.service astro-pi-cam.service
 ```
 
-The app runs on port 5000 regardless of whether wlan0 is in STA or AP mode,
+The app runs on port 80 regardless of whether wlan0 is in STA or AP mode,
 and restarts automatically on boot/crash. `astro-pi-wifi-failover` runs once
 at every boot — see below.
 
@@ -113,7 +113,7 @@ makes "at home vs. in the field" automatic:
 So: camera boots at home → joins the home WiFi automatically → `deploy.py`
 and SSH work as usual. Camera boots in the field with no known network in
 range → after ~25s it starts hosting `AstroCamera` (open, no password) →
-connect a phone to it and browse to `http://10.42.0.1:5000`.
+connect a phone to it and browse to `http://10.42.0.1`.
 
 **Known limitation** (single WiFi radio — see architecture.md): this
 decision is made once at boot. If the AP is already up and you bring the
@@ -122,13 +122,13 @@ Pi back within range of the home network, it won't switch back on its own
 
 ## Reaching the camera: IP changes with the mode, mDNS doesn't
 
-In AP mode the camera is always `http://10.42.0.1:5000` (nmcli's shared-
+In AP mode the camera is always `http://10.42.0.1` (nmcli's shared-
 mode gateway). In STA/home-WiFi mode its IP is whatever DHCP hands out
 (`192.168.1.35` on this network, but that's not guaranteed forever). If
 you switch modes and the page just stops loading, it's very likely this —
 **not a failed WiFi reconnect** — you're still pointed at the old address.
 
-The device also answers to `http://raspberrypi-2w.local:5000` via mDNS
+The device also answers to `http://raspberrypi-2w.local` via mDNS
 (`avahi-daemon`), which resolves correctly in either mode. Prefer that
 over the raw IP when you're not sure which mode the Pi is currently in.
 

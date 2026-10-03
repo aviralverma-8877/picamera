@@ -288,10 +288,10 @@
       const msg = switchingToAp
         ? "Switch to AP mode? This drops the current connection immediately. " +
           "Connect to WiFi \"AstroCamera\" (open, no password) afterward and " +
-          "browse to http://10.42.0.1:5000."
+          "browse to http://10.42.0.1."
         : "Switch to home WiFi? This drops the current connection immediately " +
           "— the camera's address changes too (it's no longer 10.42.0.1), so " +
-          "re-open this page at http://raspberrypi-2w.local:5000 afterward. " +
+          "re-open this page at http://raspberrypi-2w.local afterward. " +
           "If the home network can't actually be reached, it automatically " +
           "falls back to the AstroCamera AP.";
       if (!confirm(msg)) {
@@ -360,7 +360,7 @@
         "Rebooting…",
         "This page will reload by itself once the camera is back (about a minute). " +
         "If it doesn't, the camera may have come back up as the AstroCamera hotspot — " +
-        "join that network and open http://10.42.0.1:5000."
+        "join that network and open http://10.42.0.1."
       );
       // Wait out the shutdown half before polling, so an answer from the
       // still-running old process isn't mistaken for "back up".

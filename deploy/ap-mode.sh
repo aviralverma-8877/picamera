@@ -9,4 +9,4 @@ AP_NAME="AstroPiCamAP"
 sudo nmcli connection down "$HOME_CONN" 2>/dev/null || true
 sudo nmcli connection up "$AP_NAME"
 
-echo "AP mode active. Connect a phone to SSID 'AstroCamera' (open, no password) and browse to http://10.42.0.1:5000"
+echo "AP mode active. Connect a phone to SSID 'AstroCamera' (open, no password) and browse to http://10.42.0.1"

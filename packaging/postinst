@@ -25,6 +25,13 @@ sh "$INSTALL_DIR/deploy/setup_sudoers.sh"
 sh "$INSTALL_DIR/deploy/setup_captive_portal.sh"
 
 systemctl daemon-reload
-systemctl enable --now astro-pi-wifi-failover.service astro-pi-cam.service
+systemctl enable astro-pi-wifi-failover.service astro-pi-cam.service
+# `start` (not restart) for the failover oneshot: on a fresh install it
+# picks the WiFi mode now; on an upgrade it's already active and this is a
+# no-op — re-running it would needlessly re-decide the network mode.
+systemctl start astro-pi-wifi-failover.service
+# Restart, not just start: on an upgrade the app is already running the
+# old code, and `start` would leave it that way until the next reboot.
+systemctl restart astro-pi-cam.service
 
 exit 0

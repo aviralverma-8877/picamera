@@ -742,6 +742,47 @@ For future releases: bump `VERSION`, rebuild with
 `packaging/build-deb.sh`, test-install, then
 `gh release create v<version> <file>.deb --target <full sha>`.
 
+## 2026-10-03 — v1.0.1: captive portal fixed for Android (app moves to port 80)
+
+User reported the captive portal still didn't work on the hotspot from an
+Android phone. Root cause, found on the device rather than guessed:
+`ss -ltnp` showed **nothing listening on port 80** — only the app on 5000.
+Android's connectivity check is plain `http://` on port 80, so the probe
+reached the Pi (DNS worked) and was refused, which Android reads as "no
+internet", not "captive portal". Every earlier captive-portal test called
+the probe paths on `:5000`, which is how it slipped through.
+
+- The app now listens on port 80 (user OK'd dropping 5000). Runs as `pi`
+  still: `AmbientCapabilities=CAP_NET_BIND_SERVICE` in the unit, not root.
+  Addresses are now plain `http://10.42.0.1` / `http://raspberrypi-2w.local`;
+  updated in the UI dialogs, `ap-mode.sh`, and docs.
+- Probes arriving under a hijacked hostname now redirect to the absolute
+  `http://10.42.0.1/` instead of a relative `/`, so the phone's sign-in
+  window lands on the real address.
+- **Upgrade bug fixed in `postinst`**: `systemctl enable --now` doesn't
+  restart an already-running service, so upgrading 1.0.0 → 1.0.1 would have
+  installed the new files but kept the old code (on port 5000) running
+  until a reboot. Now `restart`s the app; the WiFi failover oneshot is only
+  `start`ed (a no-op on upgrade, so it doesn't re-decide network mode).
+
+### Verified live on 192.168.1.35
+
+- Port 80 owned by the app process running as `pi`; old port 5000 closed;
+  dashboard 200; preview streaming on 80.
+- Probe sent with Android's real Host header
+  (`connectivitycheck.gstatic.com`) to `/generate_204` and `/gen_204` →
+  302 `Location: http://10.42.0.1/`. Same path under our own name → 302 `/`.
+- Confirmed NetworkManager passes `--conf-dir=/etc/NetworkManager/
+  dnsmasq-shared.d` to the hotspot's dnsmasq (string in its binary), then
+  started a throwaway dnsmasq on a spare port with that same conf-dir:
+  `connectivitycheck.gstatic.com`, `www.google.com`, `captive.apple.com`,
+  `anything.example` all → `10.42.0.1`.
+
+**Not verified**: Android actually popping the sign-in prompt — needs a
+phone on the hotspot. If it doesn't, check the phone's Private DNS setting
+(a fixed provider like `dns.google` bypasses the hotspot's DNS) and
+forget/rejoin `AstroCamera` so it re-checks.
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the
