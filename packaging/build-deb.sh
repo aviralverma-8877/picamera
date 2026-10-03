@@ -30,6 +30,14 @@ mkdir -p "$STAGE/etc/systemd/system"
 cp deploy/astro-pi-cam.service "$STAGE/etc/systemd/system/"
 cp deploy/astro-pi-wifi-failover.service "$STAGE/etc/systemd/system/"
 
+# --- apt source for this project's repo + its signing key, so the
+#     installed system gets future versions via `apt upgrade` ---
+mkdir -p "$STAGE/etc/apt/sources.list.d" "$STAGE/usr/share/keyrings"
+cp packaging/astro-pi-cam.sources "$STAGE/etc/apt/sources.list.d/"
+cp packaging/astro-pi-cam-archive-keyring.gpg "$STAGE/usr/share/keyrings/"
+chmod 644 "$STAGE/etc/apt/sources.list.d/astro-pi-cam.sources" \
+          "$STAGE/usr/share/keyrings/astro-pi-cam-archive-keyring.gpg"
+
 # --- package metadata + maintainer scripts ---
 mkdir -p "$STAGE/DEBIAN"
 sed "s/@VERSION@/$VERSION/" packaging/control.in > "$STAGE/DEBIAN/control"

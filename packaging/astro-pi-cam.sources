@@ -1,0 +1,8 @@
+# Installed by the astro-pi-cam package so `sudo apt update && sudo apt
+# upgrade` picks up new releases. Published by .github/workflows/release.yml
+# to GitHub Pages; flat repository (Suites: ./, no Components). Only
+# packages signed by the key in Signed-By are accepted.
+Types: deb
+URIs: https://aviralverma-8877.github.io/picamera/apt/
+Suites: ./
+Signed-By: /usr/share/keyrings/astro-pi-cam-archive-keyring.gpg

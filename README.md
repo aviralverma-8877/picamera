@@ -54,14 +54,32 @@ docs/       architecture.md (design + rationale), setup.md (device setup
 [latest release](https://github.com/aviralverma-8877/picamera/releases/latest):
 
 ```sh
-wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.1/astro-pi-cam_1.0.1_all.deb
-sudo apt install ./astro-pi-cam_1.0.1_all.deb
+wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.2/astro-pi-cam_1.0.2_all.deb
+sudo apt install ./astro-pi-cam_1.0.2_all.deb
 ```
 
 Handles dependencies, the app, the AP profile, the sudoers rule, the
-captive-portal DNS override, and both systemd services in one step. To
-build the package yourself from source instead, see
+captive-portal DNS override, and both systemd services in one step. It
+also adds this project's signed apt repository, so after that one manual
+install, new versions arrive with the normal:
+
+```sh
+sudo apt update && sudo apt upgrade
+```
+
+To build the package yourself from source instead, see
 [`docs/setup.md`](docs/setup.md#fresh-install-recommended-one-deb-package).
+
+## Releasing a new version
+
+Bump `VERSION`, commit, then push a matching tag:
+
+```sh
+git tag v1.0.3 && git push origin v1.0.3
+```
+
+The `Release` GitHub Actions workflow builds the `.deb`, creates the
+GitHub release, and publishes it to the apt repository.
 
 For the manual, step-by-step version of the same setup (useful for
 understanding what's happening, or tweaking a single piece), or for how

@@ -28,6 +28,29 @@ below, just run automatically by the package's `postinst`. A capture
 directory already populated with photos is never touched, even on
 `apt purge`.
 
+### Updates after the first install: `apt upgrade`
+
+The package installs `/etc/apt/sources.list.d/astro-pi-cam.sources` and
+the repository's public signing key
+(`/usr/share/keyrings/astro-pi-cam-archive-keyring.gpg`), pointing apt at
+`https://aviralverma-8877.github.io/picamera/apt/`. From then on:
+
+```sh
+sudo apt update && sudo apt upgrade
+```
+
+`apt` only accepts packages whose repository index is signed by that key.
+Upgrades restart the app automatically (see `packaging/postinst`). Needs
+internet, so do it on the home network, not on the hotspot.
+
+Releases are published by `.github/workflows/release.yml` when a `v*` tag
+matching `VERSION` is pushed: it builds the `.deb`, creates the GitHub
+release, and signs and pushes the updated index to the `gh-pages` branch.
+The signing key's private half is the `APT_SIGNING_KEY` repository secret
+(and in the maintainer's local GPG keyring — fingerprint
+`67089F94EA0D468F827F8E8E29F2793AD8DB1024`). If it's ever lost, devices
+need a package with a new public key installed by hand once.
+
 See `packaging/build-deb.sh`, `packaging/postinst`/`prerm`/`postrm`, and
 `packaging/control.in` for exactly what it does; the sections below are the
 same steps spelled out individually — useful for understanding what's

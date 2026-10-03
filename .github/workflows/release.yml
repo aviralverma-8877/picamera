@@ -1,0 +1,87 @@
+name: Release
+
+# Push a tag matching VERSION (e.g. `v1.0.2`) to build the .deb, attach it
+# to a GitHub release, and publish it to the signed apt repository served
+# by GitHub Pages from the gh-pages branch. Installed devices pick it up
+# with `sudo apt update && sudo apt upgrade`.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches VERSION
+        run: |
+          version="$(cat VERSION)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match VERSION ($version)" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Build the .deb
+        run: sh packaging/build-deb.sh
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "astro-pi-cam_${VERSION}_all.deb" \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+
+      - name: Import the repository signing key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
+
+      - name: Publish to the apt repository (gh-pages)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNING_KEY_FPR: 67089F94EA0D468F827F8E8E29F2793AD8DB1024
+        run: |
+          set -e
+          command -v apt-ftparchive >/dev/null || sudo apt-get install -y apt-utils
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if ! git clone --quiet --branch gh-pages --single-branch "$url" pages; then
+            git init --quiet -b gh-pages pages
+            git -C pages remote add origin "$url"
+          fi
+
+          mkdir -p pages/apt
+          cp "astro-pi-cam_${VERSION}_all.deb" pages/apt/
+          cp packaging/astro-pi-cam-archive-keyring.gpg pages/apt/
+          touch pages/.nojekyll
+
+          cd pages/apt
+          # Flat repository: one Packages index next to the .debs. Old
+          # Release files are removed first and the new one is written
+          # outside the directory, so apt-ftparchive never hashes a stale
+          # or half-written Release into itself.
+          rm -f Release InRelease Release.gpg
+          apt-ftparchive packages . > Packages
+          gzip -9kf Packages
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="astro-pi-cam" \
+            -o APT::FTPArchive::Release::Label="Astro Pi Camera" \
+            release . > ../Release.tmp
+          mv ../Release.tmp Release
+          gpg --batch --yes --local-user "$SIGNING_KEY_FPR" --clearsign -o InRelease Release
+          gpg --batch --yes --local-user "$SIGNING_KEY_FPR" --armor --detach-sign -o Release.gpg Release
+          cd ..
+
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "apt: publish astro-pi-cam ${VERSION}"
+          git push --quiet origin gh-pages
