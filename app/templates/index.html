@@ -101,6 +101,8 @@
           {% endfor %}
         </select>
       </label>
+      <label class="checkbox"><input type="checkbox" name="flip" id="flip-checkbox" {% if defaults.flip %}checked{% endif %}> Rotate 180°</label>
+      <p class="hint">Turns the preview and every capture (JPEG and raw DNG) upside down, done by the camera itself. It's the only rotation the HQ Camera supports.</p>
       <label>Number of shots
         <input type="number" step="1" min="1" max="1000" name="count" value="{{ defaults.count }}">
       </label>
@@ -199,11 +201,14 @@
       showPreviewImage();
       const iso = encodeURIComponent(isoSelect.value);
       const zoom = encodeURIComponent(zoomSlider.value);
-      previewImg.src = "{{ url_for('preview_stream') }}?iso=" + iso + "&zoom=" + zoom + "&t=" + Date.now();
+      const flip = document.getElementById("flip-checkbox").checked ? "1" : "0";
+      previewImg.src = "{{ url_for('preview_stream') }}?iso=" + iso + "&zoom=" + zoom + "&flip=" + flip + "&t=" + Date.now();
     }
 
     // Live preview should match whatever ISO the user is about to shoot at.
     isoSelect.addEventListener("change", reconnectPreview);
+    // The flip is applied by the camera, so the preview restarts with it.
+    document.getElementById("flip-checkbox").addEventListener("change", reconnectPreview);
 
     previewImg.addEventListener("load", showPreviewImage);
 

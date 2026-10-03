@@ -21,7 +21,7 @@ class CaptureSession(threading.Thread):
     would silently overwrite that session's earlier frames.
     """
 
-    def __init__(self, camera, session_name, exposure_seconds, gain, count, interval_seconds, raw=False):
+    def __init__(self, camera, session_name, exposure_seconds, gain, count, interval_seconds, raw=False, flip=False):
         super().__init__(daemon=True)
         self.camera = camera
         self.session_name = session_name
@@ -30,6 +30,7 @@ class CaptureSession(threading.Thread):
         self.count = count
         self.interval_seconds = interval_seconds
         self.raw = raw
+        self.flip = flip
 
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
@@ -78,7 +79,7 @@ class CaptureSession(threading.Thread):
                 jpeg_path = self.session_dir / f"frame_{stamp}.jpg"
                 raw_path = self.session_dir / f"frame_{stamp}.dng" if self.raw else None
 
-                self.camera.capture_still(jpeg_path, self.exposure_seconds, self.gain, raw_path)
+                self.camera.capture_still(jpeg_path, self.exposure_seconds, self.gain, raw_path, flip=self.flip)
 
                 self._set_status(completed=i, last_file=jpeg_path.name)
 

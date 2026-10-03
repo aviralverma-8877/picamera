@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 
+from libcamera import Transform
 from picamera2 import Picamera2
 from picamera2.encoders import JpegEncoder
 from picamera2.outputs import FileOutput
@@ -12,6 +13,14 @@ import config
 log = logging.getLogger(__name__)
 
 PREVIEW_STREAM_SIZE = (480, 360)
+
+
+def _transform(flip):
+    # A 180° turn (horizontal + vertical flip) is the only rotation the HQ
+    # Camera does itself: libcamera silently replaces a requested 90°/270°
+    # transpose with a plain 180° flip (checked on-device). Done on the
+    # sensor, so it's free, and raw DNGs come out turned too.
+    return Transform(hflip=1, vflip=1) if flip else Transform()
 
 
 class CameraBusyError(Exception):
@@ -88,7 +97,7 @@ class AstroCamera:
         equivalent_gain = metered_gain * metered_exposure_us / target_exposure_us
         return max(config.MIN_GAIN, min(config.MAX_GAIN, equivalent_gain))
 
-    def capture_still(self, filepath, exposure_seconds, gain=None, raw_path=None):
+    def capture_still(self, filepath, exposure_seconds, gain=None, raw_path=None, flip=False):
         """Capture one frame at a fixed (manually chosen) exposure time.
 
         `gain` is the AnalogueGain to lock in, or None for Auto ISO: a
@@ -117,7 +126,7 @@ class AstroCamera:
                     gain = self._meter_gain(exposure_us)
 
                 still_config = self._picam2.create_still_configuration(
-                    raw={} if raw_path else None
+                    raw={} if raw_path else None, transform=_transform(flip)
                 )
                 self._picam2.configure(still_config)
                 self._picam2.set_controls(
@@ -176,7 +185,7 @@ class AstroCamera:
     def release(self):
         self._lock.release()
 
-    def stream_mjpeg(self, should_stop, gain=None, zoom=1.0):
+    def stream_mjpeg(self, should_stop, gain=None, zoom=1.0, flip=False):
         """Yield MJPEG multipart frames for a live focusing preview.
 
         Caller must already hold the camera lock (see `acquire`) and must
@@ -204,7 +213,7 @@ class AstroCamera:
         output = _StreamingOutput()
         try:
             video_config = self._picam2.create_video_configuration(
-                main={"size": PREVIEW_STREAM_SIZE}
+                main={"size": PREVIEW_STREAM_SIZE}, transform=_transform(flip)
             )
             self._picam2.configure(video_config)
             controls = {"AeEnable": True, "AwbEnable": True}

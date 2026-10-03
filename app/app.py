@@ -21,6 +21,9 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 camera = AstroCamera()
 current_session = None
+# Remembered so the "Rotate 180°" box (and the preview's orientation) stay
+# as set after starting a sequence reloads the page.
+last_flip = False
 
 # Browsers don't reliably close the old multipart/x-mixed-replace connection
 # the instant an <img src> is reassigned, and there's only one physical
@@ -81,13 +84,14 @@ def index():
             "iso": config.DEFAULT_ISO,
             "count": config.DEFAULT_COUNT,
             "interval": config.DEFAULT_INTERVAL_SECONDS,
+            "flip": last_flip,
         },
     )
 
 
 @app.route("/session/start", methods=["POST"])
 def start_session():
-    global current_session
+    global current_session, last_flip
     if _session_running():
         return redirect(url_for("index"))
 
@@ -99,6 +103,7 @@ def start_session():
     except ValueError:
         return "Invalid input", 400
     raw = request.form.get("raw") == "on"
+    flip = request.form.get("flip") == "on"
 
     session_choice = request.form.get("session_choice", "__new__")
     if session_choice != "__new__":
@@ -123,7 +128,8 @@ def start_session():
     count = int(_clamp(count, config.MIN_COUNT, config.MAX_COUNT))
     interval = max(exposure, interval)
 
-    current_session = CaptureSession(camera, session_name, exposure, gain, count, interval, raw)
+    last_flip = flip
+    current_session = CaptureSession(camera, session_name, exposure, gain, count, interval, raw, flip)
     current_session.start()
     return redirect(url_for("index"))
 
@@ -156,6 +162,7 @@ def preview_stream():
     except ValueError:
         return "Invalid ISO or zoom", 400
     zoom = _clamp(zoom, config.MIN_ZOOM, config.MAX_ZOOM)
+    flip = request.args.get("flip") == "1"
 
     # Bump the generation *before* trying to acquire the lock: this is the
     # only signal that tells a still-running old stream to let go (its
@@ -179,7 +186,7 @@ def preview_stream():
 
     def generate():
         try:
-            yield from camera.stream_mjpeg(should_stop, gain=gain, zoom=zoom)
+            yield from camera.stream_mjpeg(should_stop, gain=gain, zoom=zoom, flip=flip)
         finally:
             camera.release()
 

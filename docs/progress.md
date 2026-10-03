@@ -869,6 +869,38 @@ v1.0.2 and the apt repository in place. Side effect: devices that already
 had the earlier 1.0.2 won't get this via `apt upgrade` (same version); they
 need `apt install --reinstall astro-pi-cam`. Only the test Pi was affected.
 
+## 2026-10-03 — "Rotate 180°" option (camera-native flip)
+
+User asked for a smooth 0–360° rotation slider for preview and capture.
+Before building it they asked to check whether the HQ Camera can rotate
+itself. Tested on-device: libcamera offers no rotation control; only
+flips are supported (h, v, and both = 180°), and a requested transpose
+(needed for 90°/270°) is silently changed to a 180° flip.
+
+The slider was prototyped with software rotation, but profiling on the Pi
+showed it was too slow for sequences: decode 0.5s, rotate 10.0s (bicubic)
+/ 4.8s (bilinear) / 0.6s (nearest, visibly jagged), encode 0.5s per 12MP
+frame — it would have stretched the shot interval. The user chose to
+drop it and keep only the camera's own 180° flip; the slider changes were
+reverted (they had never been committed).
+
+Implemented: a "Rotate 180°" checkbox in Capture sequence.
+`camera.py` passes `Transform(hflip=1, vflip=1)` when configuring both the
+preview stream and still captures; `CaptureSession` and the preview route
+carry the setting; the checkbox is remembered across the post-start page
+reload and restarts the preview when toggled.
+
+### Verified live on 192.168.1.35
+
+- Preview with and without the flip: extracted frames are 180° apart;
+  60 frames per 3s either way.
+- Real captures with raw DNG, flipped and not: JPEGs 180° apart, both
+  finished in the same time (4.6s vs 4.5s — no cost), DNGs written, and
+  the DNG CFAPattern changes from BGGR to RGGB, confirming the raw data is
+  flipped by the sensor too.
+- Checkbox stays ticked after starting a sequence.
+- Test sessions deleted afterwards.
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the

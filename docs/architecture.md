@@ -209,6 +209,17 @@ packaging/
   generation counter right before launching the switch script, so a
   still-responsive stream self-evicts immediately rather than only
   noticing after the fact.
+- **Orientation: a 180° flip only, done by the camera**: the "Rotate 180°"
+  box passes `Transform(hflip=1, vflip=1)` when configuring the camera,
+  for both the preview stream and still captures. Checked on-device that
+  this is the only rotation the HQ Camera supports — libcamera exposes no
+  rotation control, and a requested 90°/270° transpose is silently replaced
+  with a 180° flip. Because the flip happens on the sensor it costs
+  nothing (capture time unchanged) and raw DNGs are turned too (their
+  CFAPattern changes from BGGR to RGGB). An arbitrary-angle slider was
+  prototyped first and dropped at the user's request: it needed software
+  rotation of each 12MP JPEG, which took ~10s per frame on the Zero 2 W
+  with bicubic resampling (~5s bilinear) and couldn't apply to raw DNGs.
 - **Raw DNG capture is optional per-session**: stacking software (Siril,
   DeepSkyStacker) wants raw frames, but DNGs are large (~18MB on imx477) and
   slower to write; JPEG-only is the default, raw is an opt-in checkbox.
