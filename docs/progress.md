@@ -783,6 +783,50 @@ phone on the hotspot. If it doesn't, check the phone's Private DNS setting
 (a fixed provider like `dns.google` bypasses the hotspot's DNS) and
 forget/rejoin `AstroCamera` so it re-checks.
 
+## 2026-10-03 — v1.0.2: signed apt repository, `apt upgrade` for updates
+
+- New GPG signing key (RSA 4096, sign-only, fingerprint
+  `67089F94EA0D468F827F8E8E29F2793AD8DB1024`). Private half: the
+  `APT_SIGNING_KEY` repo secret (piped straight in, never written to a
+  file) and the maintainer's local GPG keyring. Public half:
+  `packaging/astro-pi-cam-archive-keyring.gpg`, marked `binary` in
+  `.gitattributes` so line-ending normalization can't corrupt it (checked:
+  identical hash in the working tree and in the commit).
+- The `.deb` now installs `/etc/apt/sources.list.d/astro-pi-cam.sources`
+  (flat repository, `Suites: ./`) and the key under `/usr/share/keyrings/`.
+- `.github/workflows/release.yml`, on `v*` tags: checks the tag matches
+  `VERSION`, builds the `.deb`, creates the GitHub release, then
+  regenerates `Packages`/`Release` with `apt-ftparchive`, signs
+  `InRelease`/`Release.gpg`, and pushes to `gh-pages`. GitHub Pages
+  enabled on that branch (one-time API call).
+
+### Verified end to end
+
+- Tagged `v1.0.2`: the workflow passed in 8s, the release was created, and
+  `gh-pages` held the signed repository. Pages served `InRelease`; its
+  checksums cover only `Packages`/`Packages.gz`, so no stale `Release` file
+  got hashed into it.
+- **The real upgrade path on the Pi** (had 1.0.1, no repository): added
+  the same source and key 1.0.2 ships, under test names. `apt-get update`
+  fetched and verified the repository, `apt-cache policy` showed candidate
+  1.0.2 from it, and `apt-get install --only-upgrade astro-pi-cam`
+  upgraded 1.0.1 → 1.0.2 from GitHub Pages. The app restarted onto the new
+  version (PID changed), both services stayed active, and the dashboard and
+  preview worked. The package then owns its own source and key (`dpkg -S`).
+  With the test files removed, `apt update` is clean using only the
+  package's own source.
+- **Signature enforcement**: pointed a temporary source at the repository
+  with the wrong key → apt refused ("Missing key 67089F94…") and kept its
+  old index. Restored afterwards.
+- GitHub release asset and apt repository serve the identical file
+  (SHA-256 `110ea1c3…`), the one the Pi installed.
+
+Used `--only-upgrade astro-pi-cam` rather than a full `apt upgrade` so
+the test didn't upgrade unrelated system packages on the device.
+
+`actions/checkout` bumped v4 → v5 afterwards (v4 runs on deprecated
+Node 20); first exercised on the next release.
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the
