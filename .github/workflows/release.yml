@@ -33,12 +33,19 @@ jobs:
       - name: Build the .deb
         run: sh packaging/build-deb.sh
 
-      - name: Create the GitHub release
+      - name: Create the GitHub release (or replace its .deb if re-publishing)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "astro-pi-cam_${VERSION}_all.deb" \
-            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          deb="astro-pi-cam_${VERSION}_all.deb"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # Tag was moved to re-publish an existing version: keep the
+            # release and its notes, swap in the newly built package.
+            gh release upload "$GITHUB_REF_NAME" "$deb" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$deb" \
+              --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi
 
       - name: Import the repository signing key
         env:

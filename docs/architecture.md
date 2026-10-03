@@ -118,7 +118,7 @@ packaging/
   switching without a reboot.
 - **Joining the AP behaves like public WiFi (captive-portal-style)**: two
   halves. `deploy/setup_captive_portal.sh` drops a wildcard DNS override
-  (`address=/#/10.42.0.1`) into `/etc/NetworkManager/dnsmasq-shared.d/` —
+  (`address=/#/4.3.2.1`) into `/etc/NetworkManager/dnsmasq-shared.d/` —
   NetworkManager's own config-include directory for the internal dnsmasq
   it runs whenever a connection is in shared (AP) mode, confirmed present
   on-device pre-created by the NM package. This sends every hostname an
@@ -147,10 +147,31 @@ packaging/
   `AmbientCapabilities=CAP_NET_BIND_SERVICE` in the unit grants just the
   right to bind ports below 1024. Probes arriving under a hijacked foreign
   hostname (e.g. `connectivitycheck.gstatic.com`) get an absolute redirect
-  to `http://10.42.0.1/`, so the phone's sign-in window lands on the
+  to `http://4.3.2.1/`, so the phone's sign-in window lands on the
   camera's real address rather than on the borrowed hostname. Port 443 is
   deliberately left closed: Android's parallel HTTPS probe then fails fast
   and it trusts the HTTP probe's "portal" verdict.
+- **The hotspot uses `4.3.2.1/24`, not NetworkManager's default
+  `10.42.0.1`, because Android won't show a captive portal on a private
+  address.** Found on a real Galaxy S25 Ultra with dnsmasq query logging:
+  the phone resolved `connectivitycheck.gstatic.com` (correctly answered
+  `10.42.0.1`) over and over, yet never sent the HTTP check. Recent
+  Android's network stack skips the HTTP probe when the check hostname
+  resolves to a private address (10/8, 172.16/12, 192.168/16) and calls
+  the network "no internet" — a guard against exactly this kind of DNS
+  redirect. With the hotspot on a public-range address, the very next
+  test showed `GET /generate_204` → 302 and the sign-in prompt appeared.
+  `4.3.2.1` is the address commonly used for this; the hotspot has no
+  internet, so it never reaches the real host, and phones route it over
+  WiFi because it's the WiFi network's own subnet. Set via
+  `ipv4.addresses` on the nmcli profile (`deploy/setup_ap_profile.sh`) and
+  `AP_GATEWAY_IP` in `app/config.py`.
+- **`local=/#/` alongside the wildcard `address=`**: without it, every
+  non-A query (AAAA, HTTPS records, ...) gets forwarded upstream, and with
+  no upstream servers dnsmasq answers REFUSED — a server error — instead
+  of the clean empty answer a resolver expects. That turned out not to be
+  what blocked the Galaxy (it only asked for A records), but it's the
+  correct answer to give and costs nothing.
 - **Small live MJPEG preview, not a click-to-refresh shot**: `/preview.mjpg`
   streams continuous low-res (480x360) auto-exposure JPEG frames via
   Picamera2's `JpegEncoder`, shown small (240px wide) on the control page so

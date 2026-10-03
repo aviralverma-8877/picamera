@@ -827,6 +827,48 @@ the test didn't upgrade unrelated system packages on the device.
 `actions/checkout` bumped v4 → v5 afterwards (v4 runs on deprecated
 Node 20); first exercised on the next release.
 
+## 2026-10-03 — Captive portal finally working on Android (hotspot moved to 4.3.2.1)
+
+Even after the port-80 fix, the user's Galaxy S25 Ultra showed no sign-in
+prompt. Diagnosed in three rounds, each from evidence, not guesses:
+
+1. **App log:** after the phone joined, no `/generate_204` ever arrived,
+   so the check wasn't being mishandled — it wasn't being sent.
+2. **On-Pi hotspot diagnostic** (a detached script: switch to AP, capture
+   NM's dnsmasq command line from `/proc`, query the hotspot's DNS
+   locally, switch back): confirmed NM loads
+   `--conf-dir=/etc/NetworkManager/dnsmasq-shared.d` and IPv4 lookups got
+   `10.42.0.1`, but **IPv6 (AAAA) lookups got REFUSED** (no upstream
+   servers). Reproduced in a throwaway dnsmasq with NM's exact flags,
+   tested candidate configs: `filter-AAAA` didn't help; `local=/#/` gave a
+   clean NOERROR/no-data. Applied it, confirmed on the real hotspot.
+   **Still no prompt.**
+3. **Temporary dnsmasq `log-queries`** during the next phone test: the
+   phone asked only for A records (so REFUSED-on-AAAA wasn't the blocker),
+   repeatedly resolved `connectivitycheck.gstatic.com` → `10.42.0.1`, and
+   still never sent the HTTP check. That matches Android's network stack
+   skipping the HTTP probe when the check hostname resolves to a private
+   address. Moved the hotspot to `4.3.2.1/24` (`ipv4.addresses` on the
+   nmcli profile, `AP_GATEWAY_IP`, DNS answer, redirect target, UI text,
+   docs); verified on the real hotspot (DHCP range `4.3.2.10–254`, DNS →
+   `4.3.2.1`, probe → 302 `http://4.3.2.1/`).
+
+**Confirmed by the user on the phone: the sign-in prompt appears.** The
+app log for that test shows `GET /generate_204` from `4.3.2.124` → 302,
+then `GET /` a second later — the first time the check ever arrived.
+Temporary query logging removed afterwards.
+
+Hotspot dashboard address is now `http://4.3.2.1` (was `10.42.0.1`).
+
+### Re-published as v1.0.2 (per user: no new release)
+
+Release workflow now replaces the asset on an existing release
+(`gh release upload --clobber`) instead of failing on `gh release create`,
+so moving the `v1.0.2` tag to the fixed commit rebuilds and re-publishes
+v1.0.2 and the apt repository in place. Side effect: devices that already
+had the earlier 1.0.2 won't get this via `apt upgrade` (same version); they
+need `apt install --reinstall astro-pi-cam`. Only the test Pi was affected.
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the

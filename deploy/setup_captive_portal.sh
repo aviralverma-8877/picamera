@@ -18,7 +18,14 @@ set -e
 CONF_DIR=/etc/NetworkManager/dnsmasq-shared.d
 CONF_FILE="$CONF_DIR/captive-portal.conf"
 
+# address=/#/... answers every IPv4 (A) lookup with the Pi's address,
+# which must be a public-range one (see AP_GATEWAY_IP in app/config.py:
+# Android ignores captive portals that resolve to private addresses).
+# local=/#/ keeps every other query type (IPv6 AAAA, HTTPS records, ...)
+# from being forwarded upstream — the hotspot has no upstream servers, so
+# dnsmasq would otherwise answer REFUSED, a server error, instead of the
+# clean "no such record" a resolver expects.
 sudo mkdir -p "$CONF_DIR"
-printf 'address=/#/10.42.0.1\n' | sudo tee "$CONF_FILE" > /dev/null
+printf 'address=/#/4.3.2.1\nlocal=/#/\n' | sudo tee "$CONF_FILE" > /dev/null
 
 echo "Installed $CONF_FILE — takes effect next time AP mode is (re)activated."

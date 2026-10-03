@@ -59,8 +59,13 @@ MAX_ZOOM = 8.0
 # deploy/setup_sudoers.sh (grants the app passwordless sudo for exactly
 # these two scripts, nothing else).
 AP_CONNECTION_NAME = "AstroPiCamAP"
-# NetworkManager's fixed gateway address for a shared-mode (AP) connection.
-AP_GATEWAY_IP = "10.42.0.1"
+# The hotspot's own address. Deliberately NOT a private range (10.x,
+# 172.16-31.x, 192.168.x): recent Android skips its captive-portal check
+# entirely when the check hostname resolves to a private address, so a
+# private hotspot address means no sign-in prompt. Set on the nmcli
+# profile by deploy/setup_ap_profile.sh; the hotspot has no internet, so
+# this address never reaches the real host that owns it.
+AP_GATEWAY_IP = "4.3.2.1"
 HTTP_PORT = 80
 DEPLOY_DIR = APP_DIR.parent / "deploy"
 AP_MODE_SCRIPT = DEPLOY_DIR / "ap-mode.sh"
