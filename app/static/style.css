@@ -78,6 +78,10 @@ nav { display: flex; align-items: center; gap: 1rem; }
 .network-toggle {
   display: inline-flex;
   align-items: center;
+  /* It's a <label>, so it would otherwise inherit the form labels'
+     margin-bottom, which nav's align-items:center counts as part of its
+     height — pushing it visibly above the other nav items. */
+  margin-bottom: 0;
   gap: 0.35rem;
   color: #9aa0a6;
   font-size: 0.75rem;

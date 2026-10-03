@@ -695,6 +695,15 @@ still-dying old process isn't mistaken for "back"), then polls and reloads.
 **Not tested**: an actual reboot or shutdown, or the reload-after-reboot
 polling — both would take the device offline from this session.
 
+## 2026-10-03 — Nav-bar WiFi toggle sat higher than the other nav items
+
+Cause: the toggle is a `<label>`, so it picked up the global
+`label { margin-bottom: 0.75rem }` meant for form fields; `nav`'s
+`align-items: center` centers the margin box, so that margin pushed it up
+~6px relative to Gallery and the power icon. Fixed with
+`margin-bottom: 0` on `.network-toggle`. Confirmed the deployed stylesheet
+has it; visual check is on the user's side (no browser here).
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the
