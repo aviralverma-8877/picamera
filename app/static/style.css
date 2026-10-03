@@ -194,7 +194,16 @@ button {
   text-decoration: none;
   white-space: nowrap;
 }
-.preview-wrap { position: relative; width: 240px; max-width: 100%; }
+/* Fills the card up to 480px — the stream's native width (camera.py's
+   PREVIEW_STREAM_SIZE) — so it's never upscaled into blur. The wrap is
+   the crosshair's positioning box, so it has to be exactly the image's
+   size for the "+" to land on the true center. */
+.preview-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto 0.75rem;
+}
 .crosshair { position: absolute; inset: 0; pointer-events: none; }
 .crosshair-h,
 .crosshair-v {
@@ -210,11 +219,10 @@ input[type="range"] {
 }
 .preview-stream {
   display: block;
-  width: 240px;
-  max-width: 100%;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   border-radius: 6px;
   background: #000;
-  min-height: 120px;
   object-fit: contain;
 }
 .preview-placeholder {
@@ -223,9 +231,8 @@ input[type="range"] {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  width: 240px;
-  max-width: 100%;
-  min-height: 120px;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   border-radius: 6px;
   background: #000;
   color: #6b7076;

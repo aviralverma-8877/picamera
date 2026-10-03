@@ -704,6 +704,21 @@ Cause: the toggle is a `<label>`, so it picked up the global
 `margin-bottom: 0` on `.network-toggle`. Confirmed the deployed stylesheet
 has it; visual check is on the user's side (no browser here).
 
+## 2026-10-03 — Bigger, centered preview
+
+Preview was a fixed 240px, left-aligned. Now it fills the card width up to
+480px — the stream's native width (`PREVIEW_STREAM_SIZE`), so it's never
+upscaled — keeps a 4:3 `aspect-ratio`, and is centered (`margin: 0 auto`).
+The placeholder matches the same box so nothing jumps when it swaps in.
+`.preview-wrap` stays exactly the image's size, so the crosshair overlay
+still lands on the true center.
+
+The same screenshot showed the preview as a solid black box, so checked
+the stream rather than assuming: pulled 3s from `/preview.mjpg` on the
+Pi's loopback — 62 frames, and an extracted frame showed a real scene.
+Stream was healthy; the black box was the client side (likely a stale
+connection from before a service restart).
+
 ### Not yet done
 
 - An actual reboot via the UI (checks the reload polling and that the
