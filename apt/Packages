@@ -73,3 +73,29 @@ Description: Standalone WiFi-AP astrophotography camera controller
  Assumes the standard Raspberry Pi OS "pi" user; installs the app under
  that user's home directory and runs it as that user.
 
+Package: astro-pi-cam
+Architecture: all
+Version: 1.0.5
+Priority: optional
+Section: misc
+Maintainer: Aviral Verma <aviral.verma.8877@gmail.com>
+Depends: python3-picamera2, python3-flask, python3-pil, network-manager, dnsmasq-base, avahi-daemon, bluez, rfkill, sudo
+Filename: ./astro-pi-cam_1.0.5_all.deb
+Size: 42102
+MD5sum: 9c138c1bc18bb51c8041ff008a9cd477
+SHA1: 282b5e38cda33de56c266c44a8fd40afef5eeab9
+SHA256: 5d2b07cbefd87721b9c21ec82156d74d574bc3a12e542c445f84279f0f5ee54e
+SHA512: 85dbf2733dc5f89264647bd091a79c3d488f06996a8a252e5086778d0ef4658c075a0c31780bc9c648e8492b4e3a6ee77501825d55fb1d99c1ddf23d0758a8f0
+Homepage: https://github.com/aviralverma-8877/picamera
+Description: Standalone WiFi-AP astrophotography camera controller
+ Flask-based control app for a Raspberry Pi HQ Camera on a Pi Zero 2 W.
+ Hosts its own open WiFi access point in the field, with captive-portal
+ style onboarding, or joins a known network automatically at home.
+ Manual exposure/ISO capture sequences, named/appendable sessions, a
+ live focusing preview with digital zoom and center crosshair, raw DNG
+ capture, a gallery with per-image/session download and delete, and
+ telescope mount control over Bluetooth (iOptron, via an SPP adapter).
+ .
+ Assumes the standard Raspberry Pi OS "pi" user; installs the app under
+ that user's home directory and runs it as that user.
+
