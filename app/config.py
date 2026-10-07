@@ -70,3 +70,8 @@ HTTP_PORT = 80
 DEPLOY_DIR = APP_DIR.parent / "deploy"
 AP_MODE_SCRIPT = DEPLOY_DIR / "ap-mode.sh"
 STA_MODE_SCRIPT = DEPLOY_DIR / "sta-mode.sh"
+# Scans for / joins WiFi networks from the dashboard (also run, via sudo,
+# under the same sudoers rule). It records the outcome of the latest join
+# attempt here, readable by the app's unprivileged user.
+WIFI_SCRIPT = DEPLOY_DIR / "wifi.sh"
+WIFI_RESULT_FILE = Path("/run/astro-pi-cam/wifi-result")

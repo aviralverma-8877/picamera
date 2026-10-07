@@ -945,3 +945,78 @@ boot-time WiFi failover's "known network in range" branch, on a real boot.
 - No real-sky test yet — all captures above were indoor test shots to
   verify the pipeline, not actual astrophotography.
 - ST7789 display HAT is still out of scope (see architecture.md).
+
+## 2026-10-07 — Scan for and join WiFi networks from the dashboard
+
+New **WiFi** card on the control page: **Scan** lists nearby networks
+(strongest first, one entry per SSID, the current one and saved ones
+marked; enterprise/WEP shown but disabled), tap one to enter its password
+and **Connect**, or **Other network…** to type a name (hidden networks,
+or ones the scan missed). Covers both asks: changing the camera's network
+(new router/SSID), and getting it off the hotspot when it's stuck in AP
+mode.
+
+- New `deploy/wifi.sh` (root) holds every WiFi mode change: `ap`, `home`,
+  `scan`, `connect`. `ap-mode.sh`, `sta-mode.sh` and the boot failover now
+  call it. This also removes the hard-coded home connection name
+  (`netplan-wlan0-TATA_3071`) from the shipped scripts: "home" is now any
+  saved WiFi profile, in NetworkManager's preference order.
+- App routes: `GET /wifi/scan`, `POST /wifi/connect` (JSON, validated:
+  SSID ≤ 32 bytes, password 8–63 chars or 64 hex, no newlines),
+  `GET /wifi/status` (outcome of the last attempt, with its age computed
+  on the Pi since its clock and the phone's may disagree).
+- Sudoers rule gains exactly `wifi.sh scan` and `wifi.sh connect`.
+- A failed join deletes its new profile, rejoins the previous network (or
+  starts the AP) and leaves the reason for the page to show.
+- The "switch to WiFi" confirmation now uses the device's real hostname
+  instead of a hard-coded `raspberrypi-2w.local`.
+
+**Moved to its own page** (at the user's request, like the gallery): a
+WiFi icon in the dashboard's nav bar opens `/wifi` (`wifi.html`), which
+scans as soon as it opens.
+
+### Tested
+
+Off-device first (Flask test client with nmcli stubbed, `node --check` on
+both pages' scripts, `sh -n`/`dash -n` on the shell scripts), then **on
+192.168.1.35**, deployed with `deploy.py` + `setup_sudoers.sh` re-run. The
+switching steps ran as a script on the Pi itself (they cut off SSH),
+logging to a file:
+
+- Live scan through the app in STA mode: 1.6s, 8 networks, hidden ones
+  filtered, the home network marked in use and saved. `nmcli -g` does
+  *not* escape the SSID; the code handles either form.
+- A — wrong password for the home network, from STA: failed with "Secrets
+  were required", back on `TATA_3071`, original profile (same UUID)
+  intact, no leftover temporary profile.
+- B — toggle to AP: AP up in 2s; `/wifi/scan` returned the cached list
+  (age 2s, 8 networks, nothing marked in use).
+- C — from AP, join the saved home network with no password: connected
+  in 8s.
+- D — to AP, then wrong password from AP: failed in 18s, back on the AP,
+  reason readable at `/wifi/status`.
+- E — from AP, `sta-mode.sh`: rejoined home in 2s (found through the
+  saved-profile search, no hard-coded name).
+- F — typed (hidden) SSID that doesn't exist: failed in 32s with "could
+  not be found", back on home.
+- G — home network with its real password (read from NetworkManager on
+  the Pi, never printed): connected in 8s, the old profile replaced by
+  the new one (new UUID, still named `TATA_3071`, one profile only).
+- `/wifi` page served, nav icon present; test files removed afterwards.
+
+Found by the test and fixed: NetworkManager's "could not be found"
+wording wasn't mapped to the friendly "network not found" message.
+
+Also noticed: on this device the home profile is now called `TATA_3071`,
+not `netplan-wlan0-TATA_3071` — so the old hard-coded `sta-mode.sh` was
+already broken here; the saved-profile search fixes it. `/tmp` is tmpfs
+(RAM) on this image, which matters for the session-zip download.
+
+### Not yet done
+
+- The page hasn't been looked at in a real browser (Chrome automation was
+  unavailable): layout of the network list, the inline password form and
+  the overlay on a phone.
+- The full phone flow: phone on `AstroCamera`, join a network, phone
+  follows it, and the failure reason shown after rejoining the hotspot.
+- Boot-time failover through `wifi.sh ap` with no known network in range.

@@ -25,7 +25,8 @@ app/
                        at a fixed interval, exposes polls-able status
   config.py           Defaults/limits, captures directory
   templates/           index.html (control form + live status),
-                       gallery.html (browse/download past sessions)
+                       gallery.html (browse/download past sessions),
+                       wifi.html (scan for / join WiFi networks)
   static/style.css    mobile-first styling
 
 deploy/
@@ -36,7 +37,9 @@ deploy/
   setup_sudoers.sh              one-time: passwordless sudo for the two mode scripts
   setup_captive_portal.sh       one-time: DNS wildcard redirect for AP clients
   wifi-failover.sh              run by the failover service at boot
-  ap-mode.sh / sta-mode.sh      toggle wlan0 between field AP and home STA
+  wifi.sh                       every WiFi mode change: start the AP, join the
+                                 best saved network, scan, join a new network
+  ap-mode.sh / sta-mode.sh      thin wrappers: `wifi.sh ap` / `wifi.sh home`
   deploy.py                     fast dev-iteration push (SFTP app/+deploy/, restart)
 
 packaging/
@@ -108,6 +111,32 @@ packaging/
   to 15s after bringing the home connection up, and if wlan0 still isn't
   actually connected to it, brings the AP back up instead of leaving the
   Pi with no network until a reboot.
+- **Joining a WiFi network from the dashboard goes through one root
+  script, `deploy/wifi.sh`**, which also now does the AP / home switching
+  (`ap-mode.sh`, `sta-mode.sh` and the boot failover just call it). "Home"
+  is no longer one hard-coded connection name: it's every saved WiFi
+  profile except the AP, tried in NetworkManager's own preference order
+  (autoconnect priority, then most recently used) — so a network joined
+  from the dashboard is immediately what "switch to WiFi" and reboot use,
+  and the package works on devices that never saw the original home
+  network. The app may run only `wifi.sh scan` and `wifi.sh connect`
+  (exact arguments in the sudoers rule); the SSID and password go to it
+  over stdin, not argv, so they don't show in `ps` for the long-running
+  script. A new network gets a profile under a temporary name and
+  replaces any older profile for the same SSID only once it has actually
+  connected, so a mistyped password never costs a working one. On failure
+  the temporary profile is deleted, the script rejoins the previous
+  network (or starts the AP), and writes the reason to
+  `/run/astro-pi-cam/wifi-result`; the page reads it back through
+  `/wifi/status` after the phone finds its way back. A `flock` keeps two
+  mode changes from interleaving. The request itself is fire-and-forget,
+  like the toggle, since it tears down the connection it arrived on.
+- **Scan results in AP mode come from a cache**: with one radio hosting the
+  AP, a scan would mean leaving the AP's channel and possibly dropping the
+  phone that asked for it. So every path that starts the AP (`wifi.sh ap`,
+  used by the toggle, the boot failover and failed joins) saves a scan
+  first, and in AP mode the dashboard shows that list with its age, plus a
+  typed-name option for anything missing. Live scans happen in STA mode.
 - **The boot-time decision doesn't continuously re-evaluate** — a direct
   consequence of the single-WiFi-radio constraint above: once the radio is
   busy hosting the AP, it can't simultaneously scan for the home network in

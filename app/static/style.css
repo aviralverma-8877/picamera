@@ -280,3 +280,85 @@ img.thumb {
   pointer-events: none;
 }
 #status { font-size: 0.95rem; line-height: 1.4; }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.card-header h2 { margin: 0; }
+button.small {
+  width: auto;
+  padding: 0.4rem 0.75rem;
+  margin-top: 0;
+  font-size: 0.85rem;
+}
+button.secondary { background: #2a2d34; color: #e8e8e8; }
+button:disabled { opacity: 0.55; }
+.power-overlay-box button { margin-top: 1rem; }
+.button-row { display: flex; gap: 0.5rem; }
+.link-button {
+  width: auto;
+  padding: 0.5rem 0;
+  margin-top: 0.25rem;
+  background: none;
+  color: #7fd1ff;
+  font-size: 0.9rem;
+}
+.wifi-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+.wifi-list li + li { border-top: 1px solid #23262d; }
+.wifi-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.7rem 0.25rem;
+  border-radius: 4px;
+  background: none;
+  color: #e8e8e8;
+  font-size: 0.95rem;
+  text-align: left;
+}
+.wifi-row.selected { background: #1f232a; }
+.wifi-row:disabled { opacity: 1; color: #9aa0a6; }
+.wifi-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wifi-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #23262d;
+  color: #7fd1ff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wifi-lock { font-size: 0.8rem; }
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.signal-bars span { width: 3px; background: #3a3e46; border-radius: 1px; }
+.signal-bars span:nth-child(1) { height: 25%; }
+.signal-bars span:nth-child(2) { height: 50%; }
+.signal-bars span:nth-child(3) { height: 75%; }
+.signal-bars span:nth-child(4) { height: 100%; }
+.signal-bars span.on { background: #7fd1ff; }
+.wifi-form {
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: #0f1115;
+}

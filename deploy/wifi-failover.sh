@@ -29,4 +29,4 @@ while [ "$elapsed" -lt "$WAIT_SECONDS" ]; do
 done
 
 echo "No known WiFi network found after ${WAIT_SECONDS}s - starting the AstroCamera AP."
-nmcli connection up "$AP_NAME"
+exec "$(dirname "$0")/wifi.sh" ap

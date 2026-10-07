@@ -86,11 +86,14 @@ sh deploy/setup_sudoers.sh
 ```
 
 Installs a sudoers.d rule granting the `pi` user passwordless `sudo` for
-exactly `deploy/ap-mode.sh`, `deploy/sta-mode.sh`, `systemctl reboot`, and
-`systemctl poweroff` — nothing else (sudoers matches the arguments too, so
-this doesn't open up `systemctl` in general). This is what lets the web
-page's WiFi toggle and power menu (see below) work without the app needing
-a stored root password. The rule is validated with `visudo -c` before being
+exactly `deploy/ap-mode.sh`, `deploy/sta-mode.sh`, `deploy/wifi.sh scan`,
+`deploy/wifi.sh connect`, `systemctl reboot`, and `systemctl poweroff` —
+nothing else (sudoers matches the arguments too, so this doesn't open up
+`systemctl` in general). This is what lets the web page's WiFi toggle, WiFi
+networks card and power menu (see below) work without the app needing a
+stored root password. Re-run it after updating an existing device with
+`deploy.py` to a version that adds commands to the rule (the `.deb` re-runs
+it on every upgrade by itself). The rule is validated with `visudo -c` before being
 installed.
 
 ### 2c. Make connecting to the AP pop up the dashboard automatically
@@ -141,7 +144,38 @@ connect a phone to it and browse to `http://4.3.2.1`.
 **Known limitation** (single WiFi radio — see architecture.md): this
 decision is made once at boot. If the AP is already up and you bring the
 Pi back within range of the home network, it won't switch back on its own
-— run `deploy/sta-mode.sh` (or reboot) to reconnect for dev/SSH.
+— run `deploy/sta-mode.sh` (or reboot) to reconnect for dev/SSH, or join
+a network from the dashboard's WiFi page (below).
+
+## Joining a different WiFi network from the dashboard
+
+The **WiFi** page — the WiFi icon in the nav bar, next to Gallery — lists
+nearby networks as soon as it opens (**Scan** refreshes), marking the one
+in use and any already saved. Tap one, enter
+its password (or leave it empty for a saved network to reuse the stored
+password), and **Connect**. **Other network…** takes a typed name, for a
+hidden network or one the scan didn't list. WPA/WPA2/WPA3 Personal and
+open networks are supported; enterprise (802.1X) and WEP aren't.
+
+- Joining saves the network, so from then on the camera also joins it by
+  itself at boot whenever it's in range — this is how to move it to a new
+  home network, or a new router's SSID.
+- Its page then moves to the new network: reconnect the phone there and
+  open `http://<hostname>.local`.
+- If it can't join (wrong password, out of range), it goes back to the
+  network it was on — or the `AstroCamera` hotspot if it was on that or the
+  old network is gone too — within about a minute, and the card shows the
+  reason (e.g. "wrong password?") when you reopen the page there. A failed
+  attempt never replaces a saved network's working password.
+- **In AP mode it can't scan live** (one radio, busy hosting the hotspot),
+  so the list is the scan saved just before the hotspot started — the page
+  says how old it is. "Other network…" covers anything that isn't on it.
+
+From SSH the same thing is
+`printf '%s
+' "<ssid>" "<password>" wpa-psk 0 | sudo deploy/wifi.sh connect`
+(key management `none` for an open network, `sae` for WPA3-only; the last
+line is `1` for a hidden network).
 
 ## Reaching the camera: IP changes with the mode, mDNS doesn't
 
@@ -172,7 +206,7 @@ dependency).
 
 ```sh
 sh deploy/ap-mode.sh    # go into the field: hosts "AstroCamera" AP, drops SSH over wlan0
-sh deploy/sta-mode.sh   # back home: rejoins the home network (falls back to the AP if it can't)
+sh deploy/sta-mode.sh   # back home: joins the best saved network in range (falls back to the AP if none)
 ```
 
 ## Rebooting / shutting down from the web UI

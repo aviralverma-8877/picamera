@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astro Pi Camera — WiFi</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>WiFi</h1>
+    <nav>
+      <a href="{{ url_for('index') }}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"></path>
+        </svg>
+        Back
+      </a>
+    </nav>
+  </header>
+
+  <div id="wifi-overlay" class="power-overlay" hidden>
+    <div class="power-overlay-box">
+      <h2 id="wifi-overlay-title"></h2>
+      <p id="wifi-overlay-text"></p>
+      <button type="button" id="wifi-overlay-close" class="secondary">Close</button>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Networks</h2>
+      <button type="button" id="wifi-scan-btn" class="small">Scan</button>
+    </div>
+    <p id="wifi-current" class="hint">Checking network…</p>
+    <p id="wifi-result" class="hint warning" hidden></p>
+    <p id="wifi-scan-note" class="hint" hidden></p>
+    <ul id="wifi-list" class="wifi-list"></ul>
+    <button type="button" id="wifi-other-btn" class="link-button">Other network…</button>
+
+    <form id="wifi-form" class="wifi-form" hidden>
+      <label id="wifi-ssid-label">Network name (SSID)
+        <input type="text" id="wifi-ssid" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </label>
+      <label id="wifi-password-label">Password
+        <input type="password" id="wifi-password" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </label>
+      <label class="checkbox" id="wifi-show-password-label"><input type="checkbox" id="wifi-show-password"> Show password</label>
+      <p id="wifi-form-hint" class="hint"></p>
+      <div class="button-row">
+        <button type="button" id="wifi-cancel-btn" class="secondary">Cancel</button>
+        <button type="submit">Connect</button>
+      </div>
+    </form>
+    <p class="hint">Joining a network saves it, so the camera also joins it by itself at boot whenever it's in range. If it can't join, it goes back to its previous network, or the AstroCamera hotspot.</p>
+  </section>
+
+  <script>
+    const cameraHostUrl = "http://{{ hostname }}.local";
+    const apUrl = "http://{{ ap_ip }}";
+    const wifiScanBtn = document.getElementById("wifi-scan-btn");
+    const wifiCurrent = document.getElementById("wifi-current");
+    const wifiResult = document.getElementById("wifi-result");
+    const wifiScanNote = document.getElementById("wifi-scan-note");
+    const wifiList = document.getElementById("wifi-list");
+    const wifiOtherBtn = document.getElementById("wifi-other-btn");
+    const wifiForm = document.getElementById("wifi-form");
+    const wifiSsidLabel = document.getElementById("wifi-ssid-label");
+    const wifiSsidInput = document.getElementById("wifi-ssid");
+    const wifiPasswordLabel = document.getElementById("wifi-password-label");
+    const wifiPasswordInput = document.getElementById("wifi-password");
+    const wifiShowPasswordLabel = document.getElementById("wifi-show-password-label");
+    const wifiShowPassword = document.getElementById("wifi-show-password");
+    const wifiFormHint = document.getElementById("wifi-form-hint");
+    const overlay = document.getElementById("wifi-overlay");
+    const overlayTitle = document.getElementById("wifi-overlay-title");
+    const overlayText = document.getElementById("wifi-overlay-text");
+    const overlayClose = document.getElementById("wifi-overlay-close");
+    let wifiMode = null;        // "ap" / "sta" / ..., from /network/status
+    let wifiConnection = null;  // current network's name in STA mode
+    let wifiTarget = null;      // the network the form is open for
+    let wifiBusy = false;       // a join is in progress: pause status polling
+
+    function showOverlay(title, text) {
+      overlayTitle.textContent = title;
+      overlayText.textContent = text;
+      overlay.hidden = false;
+    }
+
+    overlayClose.addEventListener("click", () => { overlay.hidden = true; });
+
+    function friendlyWifiError(message) {
+      const m = (message || "").toLowerCase();
+      if (m.includes("secrets were required") || m.includes("802-1x") || m.includes("psk")) {
+        return "wrong password?";
+      }
+      if (m.includes("could not be found") || m.includes("no network with ssid") || m.includes("not found") || m.includes("not available")) {
+        return "network not found — out of range?";
+      }
+      if (m.includes("timeout") || m.includes("timed out")) return "timed out";
+      return message || "unknown error";
+    }
+
+    async function refreshWifiResult() {
+      try {
+        const res = await fetch("{{ url_for('wifi_status') }}", { cache: "no-store" });
+        const data = await res.json();
+        // Only a recent failure is worth showing — it's what explains why
+        // the camera came back on its old network or the hotspot.
+        // (Age is worked out on the Pi: its clock and the phone's can
+        // disagree a lot, since the Pi has no clock battery.)
+        const recent = data.age !== null && data.age < 15 * 60;
+        if (data.state === "failed" && recent) {
+          wifiResult.textContent = `Couldn't join "${data.ssid}": ${friendlyWifiError(data.message)}`;
+          wifiResult.hidden = false;
+        } else {
+          wifiResult.hidden = true;
+        }
+        return data;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function updateWifiCurrent(mode, connection) {
+      wifiMode = mode;
+      wifiConnection = connection;
+      if (mode === "ap") {
+        wifiCurrent.textContent = "Hosting the AstroCamera hotspot.";
+      } else if (mode === "sta") {
+        wifiCurrent.textContent = `Connected to "${connection}".`;
+      } else if (mode === "disconnected") {
+        wifiCurrent.textContent = "Not connected.";
+      } else {
+        wifiCurrent.textContent = "Network status unavailable.";
+      }
+    }
+
+    async function refreshNetworkStatus() {
+      if (wifiBusy) return;
+      try {
+        const res = await fetch("{{ url_for('network_status') }}", { cache: "no-store" });
+        const data = await res.json();
+        updateWifiCurrent(data.mode, data.connection);
+      } catch (e) {
+        updateWifiCurrent("unknown", null);
+      }
+    }
+
+    function signalBars(signal) {
+      const level = signal > 75 ? 4 : signal > 50 ? 3 : signal > 25 ? 2 : 1;
+      const bars = document.createElement("span");
+      bars.className = "signal-bars";
+      bars.title = `Signal ${signal}%`;
+      for (let i = 1; i <= 4; i++) {
+        const bar = document.createElement("span");
+        if (i <= level) bar.className = "on";
+        bars.appendChild(bar);
+      }
+      return bars;
+    }
+
+    function tag(text) {
+      const el = document.createElement("span");
+      el.className = "wifi-tag";
+      el.textContent = text;
+      return el;
+    }
+
+    function closeWifiForm() {
+      wifiForm.hidden = true;
+      wifiTarget = null;
+      wifiPasswordInput.value = "";
+      wifiList.querySelectorAll(".wifi-row.selected").forEach((r) => r.classList.remove("selected"));
+    }
+
+    // network is a scan result, or null for "Other network…" (typed by hand,
+    // which also covers hidden networks and ones the scan didn't catch).
+    function openWifiForm(network, anchor) {
+      wifiList.querySelectorAll(".wifi-row.selected").forEach((r) => r.classList.remove("selected"));
+      wifiTarget = network;
+      const manual = network === null;
+      const secured = manual || !!network.security;
+      wifiSsidLabel.hidden = !manual;
+      wifiSsidInput.value = "";
+      wifiPasswordLabel.hidden = !secured;
+      wifiShowPasswordLabel.hidden = !secured;
+      wifiPasswordInput.value = "";
+      if (manual) {
+        wifiFormHint.textContent = "Leave the password empty for an open network.";
+      } else if (network.saved && secured) {
+        wifiFormHint.textContent = "Saved network — leave the password empty to use the stored one.";
+      } else if (secured) {
+        wifiFormHint.textContent = `Secured (${network.security}).`;
+      } else {
+        wifiFormHint.textContent = "Open network — no password needed.";
+      }
+      anchor.after(wifiForm);
+      wifiForm.hidden = false;
+      if (!manual) anchor.classList.add("selected");
+      (manual ? wifiSsidInput : secured ? wifiPasswordInput : wifiForm.querySelector("[type=submit]")).focus();
+    }
+
+    function renderWifiList(networks) {
+      wifiList.replaceChildren();
+      for (const n of networks) {
+        const li = document.createElement("li");
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "wifi-row";
+        const name = document.createElement("span");
+        name.className = "wifi-name";
+        name.textContent = n.ssid;
+        row.appendChild(name);
+        if (n.in_use) row.appendChild(tag("Connected"));
+        else if (n.saved) row.appendChild(tag("Saved"));
+        if (!n.supported) row.appendChild(tag("Not supported"));
+        if (n.security) {
+          const lock = document.createElement("span");
+          lock.className = "wifi-lock";
+          lock.title = n.security;
+          lock.textContent = "🔒";
+          row.appendChild(lock);
+        }
+        row.appendChild(signalBars(n.signal));
+        row.disabled = n.in_use || !n.supported;
+        if (!n.supported) row.title = "Enterprise (802.1X) and WEP networks aren't supported";
+        row.addEventListener("click", () => openWifiForm(n, row));
+        li.appendChild(row);
+        wifiList.appendChild(li);
+      }
+    }
+
+    async function scanWifi() {
+      closeWifiForm();
+      wifiScanBtn.disabled = true;
+      wifiScanBtn.textContent = "Scanning…";
+      wifiScanNote.hidden = true;
+      try {
+        const res = await fetch("{{ url_for('wifi_scan') }}", { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Scan failed");
+        renderWifiList(data.networks);
+        if (data.source === "cached") {
+          const mins = Math.max(0, Math.round((data.scan_age || 0) / 60));
+          wifiScanNote.textContent =
+            "The camera can't scan while it's hosting the hotspot (it has one WiFi radio), " +
+            `so these are the networks it saw ${mins < 1 ? "just" : mins + " min"} before ` +
+            "the hotspot started. Use \"Other network…\" for one that isn't listed.";
+          wifiScanNote.hidden = false;
+        } else if (data.source === "none") {
+          wifiScanNote.textContent = "No scan available yet. Use \"Other network…\" to type a network name.";
+          wifiScanNote.hidden = false;
+        } else if (!data.networks.length) {
+          wifiScanNote.textContent = "No networks found.";
+          wifiScanNote.hidden = false;
+        }
+      } catch (e) {
+        wifiScanNote.textContent = "Scan failed — try again.";
+        wifiScanNote.hidden = false;
+      } finally {
+        wifiScanBtn.disabled = false;
+        wifiScanBtn.textContent = "Scan";
+      }
+    }
+
+    wifiScanBtn.addEventListener("click", scanWifi);
+    wifiOtherBtn.addEventListener("click", () => openWifiForm(null, wifiOtherBtn));
+    document.getElementById("wifi-cancel-btn").addEventListener("click", closeWifiForm);
+    wifiShowPassword.addEventListener("change", () => {
+      wifiPasswordInput.type = wifiShowPassword.checked ? "text" : "password";
+    });
+
+    wifiForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const manual = wifiTarget === null;
+      const ssid = manual ? wifiSsidInput.value.trim() : wifiTarget.ssid;
+      const password = wifiPasswordInput.value;
+      if (!ssid) {
+        wifiSsidInput.focus();
+        return;
+      }
+      const secured = manual ? password !== "" : !!wifiTarget.security;
+      const needsPassword = !manual && secured && !wifiTarget.saved;
+      if (needsPassword && !password) {
+        wifiFormHint.textContent = "Enter the network's password.";
+        wifiPasswordInput.focus();
+        return;
+      }
+      if (password && secured && (password.length < 8 || password.length > 64)) {
+        wifiFormHint.textContent = "WiFi passwords are 8 to 63 characters long.";
+        wifiPasswordInput.focus();
+        return;
+      }
+
+      const fromAp = wifiMode === "ap";
+      const previous = wifiConnection;
+      // The outcome counts as new once the result file changes from this.
+      const before = await refreshWifiResult();
+      const beforeAt = before ? before.at : null;
+      let res;
+      try {
+        res = await fetch("{{ url_for('wifi_connect') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ssid,
+            password,
+            security: manual ? "" : wifiTarget.security,
+            hidden: manual,
+          }),
+        });
+      } catch (e) {
+        res = null;  // connection may already be dropping — expected
+      }
+      if (res && !res.ok) {
+        wifiFormHint.textContent = await res.text();
+        return;
+      }
+      closeWifiForm();
+      wifiBusy = true;
+
+      const fallback = fromAp || !previous
+        ? `rejoin the AstroCamera hotspot and open ${apUrl}`
+        : `it goes back to "${previous}" (or the AstroCamera hotspot if that fails) — open ${cameraHostUrl} there`;
+      showOverlay(
+        `Joining "${ssid}"…`,
+        `This page will disconnect. Connect your phone to "${ssid}" and open ${cameraHostUrl}. ` +
+        `If the camera can't join (e.g. wrong password), ${fallback} to see why.`
+      );
+
+      // If this page can still reach the camera afterward (e.g. the phone
+      // is on a network that can see it at the same address), report the
+      // outcome here instead of leaving the overlay up.
+      setTimeout(function poll() {
+        refreshWifiResult().then((data) => {
+          if (data && data.state && data.at !== beforeAt && data.state !== "connecting") {
+            if (data.state === "connected") {
+              showOverlay(`Joined "${data.ssid}"`, `The camera is now on "${data.ssid}" at ${cameraHostUrl}.`);
+            } else {
+              overlay.hidden = true;
+            }
+            wifiBusy = false;
+            refreshNetworkStatus();
+            return;
+          }
+          setTimeout(poll, 3000);
+        });
+      }, 5000);
+    });
+
+    refreshWifiResult();
+    refreshNetworkStatus();
+    setInterval(refreshNetworkStatus, 5000);
+    scanWifi();
+  </script>
+</body>
+</html>

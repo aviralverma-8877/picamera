@@ -3,9 +3,11 @@ import logging
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import threading
+import time
 import zipfile
 from pathlib import Path
 
@@ -79,6 +81,9 @@ def index():
         max_zoom=config.MAX_ZOOM,
         existing_sessions=_list_session_names(),
         default_session_name=_next_default_session_name(),
+        # For "re-open this page at http://<hostname>.local" after the
+        # camera joins a different network (avahi-daemon answers for it).
+        hostname=socket.gethostname(),
         defaults={
             "exposure": config.DEFAULT_EXPOSURE_SECONDS,
             "iso": config.DEFAULT_ISO,
@@ -358,6 +363,172 @@ def network_toggle():
         log.exception("Failed to launch network mode switch")
         return f"Failed to switch network mode: {exc}", 500
     return jsonify({"switching_to": "sta" if mode == "ap" else "ap"})
+
+
+def _split_nmcli_terse(line):
+    """Splits one line of `nmcli -t` output on its unescaped ':' separators
+    (nmcli writes a literal ':' or '\\' inside a value as '\\:' / '\\\\')."""
+    fields, current, chars = [], [], iter(line)
+    for ch in chars:
+        if ch == "\\":
+            current.append(next(chars, ""))
+        elif ch == ":":
+            fields.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    fields.append("".join(current))
+    return fields
+
+
+def _nmcli_unescape(value):
+    """Undoes nmcli's '\\:' / '\\\\' escaping in a single value."""
+    out, chars = [], iter(value)
+    for ch in chars:
+        out.append(next(chars, "") if ch == "\\" else ch)
+    return "".join(out)
+
+
+def _key_mgmt_for(security):
+    """nmcli key-mgmt for a scan result's SECURITY column, or None if it's
+    a kind of network this form can't join (enterprise / WEP)."""
+    if not security or security == "--":
+        return "none"
+    if "802.1X" in security or "WEP" in security:
+        return None
+    if "WPA3" in security and "WPA2" not in security and "WPA1" not in security:
+        return "sae"
+    return "wpa-psk"
+
+
+@app.route("/wifi")
+def wifi_page():
+    return render_template(
+        "wifi.html",
+        # For "open http://<hostname>.local" once the camera has joined a
+        # different network (avahi-daemon answers for it), and the AP's
+        # address for when a failed join brings the hotspot back.
+        hostname=socket.gethostname(),
+        ap_ip=config.AP_GATEWAY_IP,
+    )
+
+
+@app.route("/wifi/scan")
+def wifi_scan():
+    try:
+        out = subprocess.run(
+            ["sudo", "-n", str(config.WIFI_SCRIPT), "scan"],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=True,
+        ).stdout
+    except Exception:
+        log.exception("WiFi scan failed")
+        return jsonify({"error": "Scan failed"}), 500
+
+    source, scan_age = "none", None
+    saved = set()
+    networks = {}
+    for line in out.splitlines():
+        kind, _, rest = line.partition(" ")
+        if kind == "SOURCE":
+            parts = rest.split()
+            source = parts[0] if parts else "none"
+            if source == "cached" and len(parts) > 1:
+                scan_age = int(parts[1])
+        elif kind == "SAVED":
+            # nmcli -g escapes ':' and '\' the same way terse output does.
+            saved.add(_nmcli_unescape(rest))
+        elif kind == "NETWORK":
+            fields = _split_nmcli_terse(rest)
+            if len(fields) < 4 or not fields[1]:
+                continue  # hidden networks have no SSID to show
+            in_use, ssid, signal, security = fields[:4]
+            signal = int(signal) if signal.isdigit() else 0
+            known = networks.get(ssid)
+            # One entry per SSID (a mesh/extender shows up once per access
+            # point), keeping the strongest signal.
+            if known is None or signal > known["signal"]:
+                networks[ssid] = {
+                    "ssid": ssid,
+                    "signal": signal,
+                    "security": "" if security == "--" else security,
+                    "supported": _key_mgmt_for(security) is not None,
+                    "in_use": (known or {}).get("in_use", False),
+                }
+            # A cached scan's IN-USE column is stale: it was taken before
+            # the AP started, and right now the AP is what's in use.
+            if in_use == "*" and source == "live":
+                networks[ssid]["in_use"] = True
+
+    for n in networks.values():
+        n["saved"] = n["ssid"] in saved
+    ordered = sorted(networks.values(), key=lambda n: (not n["in_use"], -n["signal"]))
+    return jsonify({"source": source, "scan_age": scan_age, "networks": ordered})
+
+
+@app.route("/wifi/connect", methods=["POST"])
+def wifi_connect():
+    data = request.get_json(silent=True) or {}
+    ssid = str(data.get("ssid", ""))
+    password = str(data.get("password", ""))
+    hidden = bool(data.get("hidden"))
+
+    if not ssid or len(ssid.encode("utf-8")) > 32 or any(c in ssid for c in "\r\n\0"):
+        return "Enter a network name of up to 32 characters", 400
+    if any(c in password for c in "\r\n\0"):
+        return "Invalid password", 400
+
+    if hidden:
+        # Typed by hand, so there's no scan result to say what security it
+        # uses: a password means WPA/WPA2 Personal, none means open.
+        key_mgmt = "wpa-psk" if password else "none"
+    else:
+        key_mgmt = _key_mgmt_for(str(data.get("security", "")))
+        if key_mgmt is None:
+            return "Enterprise (802.1X) and WEP networks aren't supported", 400
+    if password and key_mgmt != "none" and not (
+        8 <= len(password) <= 63 or re.fullmatch(r"[0-9A-Fa-f]{64}", password)
+    ):
+        return "WiFi passwords are 8 to 63 characters long", 400
+    # An empty password for a secured network is allowed: wifi.sh then uses
+    # the profile saved from the last time this network was joined.
+
+    # Same reasoning as /network/toggle: the preview stream on this page is
+    # about to be orphaned by the network change.
+    _next_preview_generation()
+    try:
+        # Fire-and-forget, as with /network/toggle: joining the network
+        # tears down the connection this request probably came in on. The
+        # password goes over stdin, not argv, so it isn't visible in `ps`.
+        proc = subprocess.Popen(
+            ["sudo", "-n", str(config.WIFI_SCRIPT), "connect"],
+            stdin=subprocess.PIPE,
+            text=True,
+        )
+        proc.stdin.write(f"{ssid}\n{password}\n{key_mgmt}\n{1 if hidden else 0}\n")
+        proc.stdin.close()
+        # Reap it when it finishes so it doesn't linger as a zombie.
+        threading.Thread(target=proc.wait, daemon=True).start()
+    except Exception as exc:
+        log.exception("Failed to launch WiFi connect")
+        return f"Failed to start connecting: {exc}", 500
+    return jsonify({"connecting_to": ssid})
+
+
+@app.route("/wifi/status")
+def wifi_status():
+    """Outcome of the most recent /wifi/connect attempt, as recorded by
+    wifi.sh — so after a failed join drops the phone back onto the AP, the
+    page can say why (e.g. wrong password)."""
+    try:
+        state, ssid, message, at = config.WIFI_RESULT_FILE.read_text().split("\n")[:4]
+    except (OSError, ValueError):
+        return jsonify({"state": None})
+    at = int(at) if at.isdigit() else None
+    age = int(time.time()) - at if at is not None else None
+    return jsonify({"state": state, "ssid": ssid, "message": message, "at": at, "age": age})
 
 
 def _power_action(systemctl_verb):

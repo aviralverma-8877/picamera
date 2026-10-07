@@ -24,6 +24,10 @@ exposure sequences through a small web UI.
   if one's in range, otherwise hosts its own open `AstroCamera` AP so a
   phone can connect in the field with zero setup. A toggle switch in the
   nav bar also lets you flip modes by hand at any time.
+- **Scan for and join WiFi networks from the dashboard** — move the camera
+  to a new network, or get it off its hotspot onto one, without SSH. A
+  failed join (e.g. wrong password) falls back to the previous network or
+  the hotspot, and says why.
 - **Connects like public WiFi** — joining the `AstroCamera` AP pops up a
   "sign in to this network" prompt straight to the dashboard, the same way
   a hotel or café hotspot does, instead of needing to know to open a
