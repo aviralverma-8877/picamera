@@ -63,8 +63,8 @@ docs/       architecture.md (design + rationale), setup.md (device setup
 [latest release](https://github.com/aviralverma-8877/picamera/releases/latest):
 
 ```sh
-wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.4/astro-pi-cam_1.0.4_all.deb
-sudo apt install ./astro-pi-cam_1.0.4_all.deb
+wget https://github.com/aviralverma-8877/picamera/releases/download/v1.0.5/astro-pi-cam_1.0.5_all.deb
+sudo apt install ./astro-pi-cam_1.0.5_all.deb
 ```
 
 Handles dependencies, the app, the AP profile, the sudoers rule, the
@@ -84,7 +84,7 @@ To build the package yourself from source instead, see
 Bump `VERSION`, commit, then push a matching tag:
 
 ```sh
-git tag v1.0.4 && git push origin v1.0.4
+git tag v1.0.5 && git push origin v1.0.5
 ```
 
 The `Release` GitHub Actions workflow builds the `.deb`, creates the
