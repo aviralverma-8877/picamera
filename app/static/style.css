@@ -11,7 +11,13 @@ body {
   color: #e8e8e8;
   padding: 0 0 2rem;
 }
+/* Stays pinned while the page scrolls, so the nav (Bluetooth, WiFi,
+   Gallery, power) is always one tap away. Below the full-screen overlays
+   (z-index 100), above everything else. */
 header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -378,15 +384,10 @@ button:disabled { opacity: 0.55; }
 .button-row > button { flex: 1; }
 .mount-info { margin-bottom: 0.75rem; }
 .mount-conn {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.75rem;
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: #9aa0a6;
 }
-.mount-conn a { color: #7fd1ff; text-decoration: none; white-space: nowrap; }
 .mount-readout {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;

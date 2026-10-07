@@ -1232,3 +1232,14 @@ Checked on 192.168.1.35 after a restart: the served dashboard has no
 Mount card, one overlay with the four directions, speed, Zero and Stop;
 both pages' scripts pass `node --check`; mount reconnected afterwards.
 Still not seen on a real phone.
+
+## 2026-10-07 — Sticky nav bar; one Bluetooth link
+
+- The header (title + nav) now stays pinned to the top while scrolling,
+  on every page (`position: sticky`, z-index below the full-screen
+  overlays and above the preview's controls).
+- Removed the second Bluetooth link under the preview; the nav-bar icon
+  is the one way in, and the "no mount connected" line points to it.
+
+Deployed to 192.168.1.35 and restarted; served page checked (one
+Bluetooth link, script passes `node --check`); mount reconnected.

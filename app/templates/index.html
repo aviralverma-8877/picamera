@@ -93,10 +93,7 @@
     </div>
     <p class="hint warning mount-error" hidden></p>
     <div class="mount-info">
-      <p class="mount-conn">
-        <span id="mount-conn">Checking mount…</span>
-        <a href="{{ url_for('bluetooth_page') }}">Bluetooth</a>
-      </p>
+      <p id="mount-conn" class="mount-conn">Checking mount…</p>
       <p id="mount-readout" class="mount-readout" hidden></p>
       <p id="mount-connected-only" class="hint" hidden>Hold N/S/E/W on the preview to move the mount at the speed shown top-left. Zero (bottom-left) slews to the zero position; Stop halts everything, including that slew.</p>
     </div>
@@ -390,7 +387,7 @@
       if (!d.connected) {
         mountConn.textContent = d.reconnecting
           ? `Lost the connection to "${d.name}" — reconnecting…`
-          : "No mount connected — connect its adapter to move it from the preview.";
+          : "No mount connected — connect one from the Bluetooth icon above to move it from the preview.";
         mountReadout.hidden = true;
         endMountHold();
         return;
