@@ -1172,3 +1172,22 @@ still wait for a running scan, and auto-reconnect stays for other drops.
 - Scan while connected: no drop in 50s.
 - Not exercised: the stale-bond re-pair path (needs the adapter
   reflashed).
+
+## 2026-10-07 — v1.0.5 released (mount control over Bluetooth); test Pi upgraded via apt
+
+Committed the Bluetooth mount control work, bumped `VERSION`, pushed tag
+`v1.0.5`; the release workflow built and published the package in one
+run (11s). The apt index listed 1.0.5 within a minute.
+
+The hand-written release notes couldn't be applied from the dev machine
+(`gh release edit` → HTTP 403: its token can push tags but not edit
+releases), so the release still has the auto-generated notes; replace
+them from the GitHub web UI.
+
+Upgraded the test Pi from the deploy.py copy to the package with
+`apt-get install --only-upgrade astro-pi-cam`: installed cleanly; both
+services active; `postinst` re-ran `setup_sudoers.sh`, so the rule now
+includes `rfkill unblock bluetooth`; the Pi stayed on `TATA_3071`.
+Afterwards the Bluetooth page's list showed `SmartEQ-RJ9` as last used,
+and connecting through the packaged app took 2s, reusing the bond (mount
+at its zero position, RA/Dec read back).
