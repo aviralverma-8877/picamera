@@ -1020,3 +1020,17 @@ already broken here; the saved-profile search fixes it. `/tmp` is tmpfs
 - The full phone flow: phone on `AstroCamera`, join a network, phone
   follows it, and the failure reason shown after rejoining the hotspot.
 - Boot-time failover through `wifi.sh ap` with no known network in range.
+
+## 2026-10-07 — v1.0.4 released (WiFi page); test Pi upgraded via apt
+
+Bumped `VERSION`, pushed tag `v1.0.4`; the release workflow built and
+published the package in one run (9s), release notes written by hand
+afterwards. The apt repository lists 1.0.2–1.0.4.
+
+Upgraded the test Pi from the deploy.py copy to the 1.0.4 package with
+`apt-get install --only-upgrade astro-pi-cam` (repository index refreshed
+first): installed cleanly; both services active; `postinst` re-ran
+`setup_sudoers.sh`, so the rule includes `wifi.sh scan`/`connect` without
+a manual step; `deploy/wifi.sh` is now owned by the package; the Pi
+stayed on `TATA_3071` throughout. After the upgrade `/wifi` serves and
+`/wifi/scan` does a live scan (8 networks, `TATA_3071` in use).
