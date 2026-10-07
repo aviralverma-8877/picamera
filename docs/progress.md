@@ -1322,3 +1322,10 @@ Track and Zero), screen-stays-on, and the sticky nav bar.
 
 Committed the Track button and keep-awake work, moved `v1.0.5` to the
 new commit and re-published it.
+
+Result: the workflow run succeeded; the v1.0.5 release page now shows
+`docs/release-notes/v1.0.5.md` (identical apart from a trailing newline)
+and the rebuilt `.deb`. The test Pi pulled it with `apt install
+--reinstall astro-pi-cam` (sha256 matched the release asset): both
+services active, `keep-awake.mp4` and the Track button installed; mount
+reconnected afterwards.
