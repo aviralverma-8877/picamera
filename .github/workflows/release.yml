@@ -38,10 +38,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           deb="astro-pi-cam_${VERSION}_all.deb"
+          # Hand-written notes live in the repo, so they're applied with
+          # this workflow's token (the maintainer's local token can't edit
+          # releases). Without a notes file, GitHub generates them.
+          notes="docs/release-notes/${GITHUB_REF_NAME}.md"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             # Tag was moved to re-publish an existing version: keep the
-            # release and its notes, swap in the newly built package.
+            # release, swap in the newly built package, refresh its notes.
             gh release upload "$GITHUB_REF_NAME" "$deb" --clobber
+            if [ -f "$notes" ]; then
+              gh release edit "$GITHUB_REF_NAME" --notes-file "$notes"
+            fi
+          elif [ -f "$notes" ]; then
+            gh release create "$GITHUB_REF_NAME" "$deb" \
+              --title "$GITHUB_REF_NAME" --notes-file "$notes" --verify-tag
           else
             gh release create "$GITHUB_REF_NAME" "$deb" \
               --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

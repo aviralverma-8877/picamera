@@ -1256,3 +1256,69 @@ the test Pi: it pulled the new build (its sha256 matched the release
 asset), both services active, the installed CSS has the sticky header;
 mount reconnected afterwards. The release notes are still the
 auto-generated ones (see above).
+
+## 2026-10-07 — Track button on the preview
+
+Asked for: once a star is framed by hand, a button (top-right of the
+preview) that makes the mount follow the earth's rotation to keep it in
+frame.
+
+- `MountLink.set_tracking()` → `:ST1#` / `:ST0#`; `POST /mount/track`;
+  status gains `tracking_on` (`:GAS#` state Tracking, Tracking+PEC or
+  Guiding).
+- Preview overlay, top-right: "Track" pill; tap to start, it turns green
+  and reads "Tracking"; tap again to stop. Reflects the mount's own state
+  on each status poll, except mid-move.
+
+### Verified on the real mount (192.168.1.35)
+
+- Stopped: RA drifted 4s over 6s (the sky turning past a still mount).
+- `:ST1#` → `1`, state Tracking, and RA held at 07h 40m 19s over 6s —
+  the pointing follows the sky.
+- 1s nudge E at 8x while tracking, then the release's `:qR#`: still
+  Tracking (RA moved 5s from the nudge, then held).
+- Stop (`:q#`) while tracking: still Tracking — Stop halts moves and
+  slews, not tracking; the UI hint says so.
+- `:ST0#` → `1`, state back to Stopped. Left the mount stopped, slew rate
+  as it was (8x).
+- Served page has the button inside the overlay, script passes
+  `node --check`. Not yet tried on a phone.
+
+## 2026-10-08 — Dashboard keeps the phone's screen on
+
+Asked for: the phone shouldn't auto-lock while the dashboard is open, so
+long sequences and tracking stay visible.
+
+- Screen Wake Lock API when the browser offers it — which it doesn't on
+  plain http pages like this one (secure contexts only).
+- Fallback: `app/static/keep-awake.mp4` (generated with ffmpeg: 2s,
+  32x32 black H.264 baseline + silent AAC, 2.5KB, `+faststart`) played on
+  a loop by an off-DOM `<video playsinline>`, as NoSleep.js does. Every
+  tap retries until it's playing (needs a user gesture), and so does
+  returning to the page. `.gitattributes` marks `*.mp4` binary.
+
+Checked on 192.168.1.35 after a restart: the video serves as
+`video/mp4`, and range requests (iOS needs them) get `206` with
+`Accept-Ranges: bytes`; the dashboard script passes `node --check`;
+mount reconnected afterwards.
+
+**Not verified**: that phones actually stay awake — that needs a real
+phone left on the dashboard past its auto-lock time (iPhone Safari and
+Android Chrome both). Also whether the silent audio track pauses music
+playing on the phone.
+
+## 2026-10-08 — Release notes from the repo; v1.0.5 re-published again
+
+Editing release notes from the dev machine kept failing with HTTP 403:
+its `gh` login is a fine-grained token with admin on the repo but
+without release write access (git pushes go over SSH). Instead of
+needing a new token, release notes now live in the repo as
+`docs/release-notes/<tag>.md`, and the release workflow applies them with
+its own token — on a new release (`--notes-file`, falling back to
+generated notes when there's no file) and on a re-publish (`gh release
+edit --notes-file`). `docs/release-notes/v1.0.5.md` covers everything
+now in 1.0.5: Bluetooth mount control, the preview controls (including
+Track and Zero), screen-stays-on, and the sticky nav bar.
+
+Committed the Track button and keep-awake work, moved `v1.0.5` to the
+new commit and re-published it.

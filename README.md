@@ -31,8 +31,9 @@ exposure sequences through a small web UI.
 - **Telescope mount control over Bluetooth** — connect an iOptron mount
   through the ESP32 `SmartEQ-RJ9` adapter from a Bluetooth page, then nudge
   it with hold-to-move N/S/E/W buttons laid right on the live preview, so
-  you can watch the frame while it moves; slew speed (1x–Max), Stop, and
-  Go to zero position are on the preview too.
+  you can watch the frame while it moves; slew speed (1x–Max), Stop, Go to
+  zero position, and a Track button that turns the mount with the sky to
+  keep a framed star in place are on the preview too.
   Moves stop by themselves if the phone drops off mid-press.
 - **Connects like public WiFi** — joining the `AstroCamera` AP pops up a
   "sign in to this network" prompt straight to the dashboard, the same way
@@ -82,14 +83,17 @@ To build the package yourself from source instead, see
 
 ## Releasing a new version
 
-Bump `VERSION`, commit, then push a matching tag:
+Bump `VERSION`, write the release notes in
+`docs/release-notes/v<version>.md`, commit, then push a matching tag:
 
 ```sh
 git tag v1.0.5 && git push origin v1.0.5
 ```
 
 The `Release` GitHub Actions workflow builds the `.deb`, creates the
-GitHub release, and publishes it to the apt repository.
+GitHub release with those notes (GitHub generates them if there's no
+notes file), and publishes it to the apt repository. Moving an existing
+tag re-publishes that version in place: new `.deb`, refreshed notes.
 
 For the manual, step-by-step version of the same setup (useful for
 understanding what's happening, or tweaking a single piece), or for how
