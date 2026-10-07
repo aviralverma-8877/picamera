@@ -294,8 +294,11 @@ packaging/
   meant scrolling back and forth while framing. While a mount is
   connected, N/S/E/W buttons are overlaid at the preview's edge
   midpoints (clear of the center and the crosshair), with the slew speed
-  top-left, Zero (go to zero position, confirmed first) bottom-left and
-  Stop bottom-right. There's no separate Mount card: the connection
+  top-left, Track (tracking on/off) top-right, Zero (go to zero position,
+  confirmed first) bottom-left and Stop bottom-right. The Track button
+  shows the mount's own state from `:GAS#`, except while a nudge or slew
+  is running (the mount then reports Slewing, not whether tracking will
+  resume), so it doesn't flicker. There's no separate Mount card: the connection
   line, state and RA/Dec readout, and any mount error sit right under the
   preview in the Focus section. A lock serializes commands, since the
   mount answers one at a time; before each command any stray buffered
@@ -335,11 +338,30 @@ packaging/
   including a go-to-zero slew (each replies `1`); `:SR1#`–`:SR9#` set the
   slew rate 1x/2x/8x/16x/64x/128x/256x/512x/Max (reply `1`; the rate is
   also digit 4 of `:GAS#`); `:MH#` slews to the zero position (reply
-  `1`). Status is `:GAS#` (state, tracking rate, slew rate) and `:GEC#`
+  `1`); `:ST1#`/`:ST0#` start/stop tracking at the selected tracking rate
+  (reply `1`; `:GAS#` state 1 Tracking / 0 Stopped). Tracking survives a
+  nudge and its axis stop, and `:q#` too — stopping tracking takes
+  `:ST0#` — so re-centering a tracked star doesn't drop tracking. Status is `:GAS#` (state, tracking rate, slew rate) and `:GEC#`
   (Dec and RA in 0.01 arc-seconds). E/W follow the mount's own naming
   (`:me#` for E, as iOptron's software does); on the test mount `:me#`
   lowered the reported RA, i.e. turned the scope toward the western sky,
   so if E/W feel reversed in the field, that's the mount's convention.
+
+- **The dashboard keeps the phone's screen on, mostly via a silent
+  looping video**: a phone that auto-locks mid-sequence or mid-tracking
+  hides the preview and status. The Screen Wake Lock API would be the
+  clean way, but browsers only expose it on secure pages (https or
+  localhost), and the dashboard is plain http (`http://4.3.2.1`,
+  `http://<host>.local`) — https would need a certificate phones don't
+  trust, and the captive-portal sign-in depends on plain http anyway. So
+  it's used only where it exists; otherwise the page plays
+  `static/keep-awake.mp4` (2s, 32x32 black H.264 with a silent AAC track,
+  2.5KB) on a loop, never shown — the same trick as NoSleep.js. Starting
+  video with sound needs a user gesture, so every tap on the page retries
+  until it's playing, and returning to the page retries too (browsers
+  pause it while hidden). Side effect: on some phones the silent track
+  takes the audio focus, pausing other music while the dashboard is open.
+  Dashboard only; the other pages let the phone sleep as usual.
 
 ## Capture flow
 

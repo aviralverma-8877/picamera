@@ -225,9 +225,12 @@ RS-232 port.
    and connects in a couple of seconds. If the adapter is reflashed, the
    app notices the stale bond and pairs again by itself.
 3. Back on the dashboard, the mount controls appear on the live preview
-   itself — N/S/E/W at its edges, slew speed top-left, Zero (go to zero
-   position) bottom-left, Stop bottom-right — so you can watch the frame
-   while you move. The mount's state and RA/Dec show just below the
+   itself — N/S/E/W at its edges, slew speed top-left, Track top-right,
+   Zero (go to zero position) bottom-left, Stop bottom-right — so you can
+   watch the frame while you move. Once a star is framed, tap Track: the
+   mount turns with the sky to keep it in frame (the button turns green,
+   "Tracking"). Nudging keeps tracking on; Stop halts moves and slews but
+   not tracking — tap Tracking again to stop it. The mount's state and RA/Dec show just below the
    preview.
 
 Nothing to set up by hand: the image boots with Bluetooth rfkill-blocked,

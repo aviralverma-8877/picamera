@@ -190,6 +190,8 @@ def _decode_gas(r):
     return {
         "state": _STATES[state] if state < len(_STATES) else "Unknown",
         "moving": state in (2, 4),
+        # Tracking, tracking with PEC, or guiding (which tracks too).
+        "tracking_on": state in (1, 3, 5),
         "tracking": _TRACK_RATES[track] if track < len(_TRACK_RATES) else "Unknown",
         "rate": rate if 1 <= rate <= len(SLEW_RATES) else None,
     }
@@ -449,6 +451,12 @@ class MountLink:
         if not 1 <= rate <= len(SLEW_RATES):
             raise ValueError("Unknown slew rate")
         self._expect_ok(f":SR{rate}#")
+
+    def set_tracking(self, on):
+        """Starts or stops tracking — turning the RA axis with the sky so
+        a star stays put in the frame — at the mount's selected tracking
+        rate (sidereal unless changed on the hand controller)."""
+        self._expect_ok(":ST1#" if on else ":ST0#")
 
     def goto_zero(self):
         """Slews to the mount's zero (home) position: counterweight down,

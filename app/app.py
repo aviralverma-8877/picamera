@@ -615,6 +615,12 @@ def mount_rate():
     return _mount_action(lambda: mount.set_rate(rate))
 
 
+@app.route("/mount/track", methods=["POST"])
+def mount_track():
+    on = bool((request.get_json(silent=True) or {}).get("on"))
+    return _mount_action(lambda: mount.set_tracking(on))
+
+
 @app.route("/mount/zero", methods=["POST"])
 def mount_zero():
     return _mount_action(mount.goto_zero)

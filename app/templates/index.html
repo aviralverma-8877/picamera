@@ -87,6 +87,7 @@
         <button type="button" class="ov-dir ov-e" data-dir="e" aria-label="Move east">E</button>
         <button type="button" class="ov-dir ov-w" data-dir="w" aria-label="Move west">W</button>
         <button type="button" class="ov-dir ov-s" data-dir="s" aria-label="Move south">S</button>
+        <button type="button" class="ov-track" id="mount-track" aria-pressed="false" title="Track the sky, keeping the star in frame">Track</button>
         <button type="button" class="ov-zero" id="mount-zero" title="Go to zero position">Zero</button>
         <button type="button" class="ov-stop mount-stop-btn">Stop</button>
       </div>
@@ -95,7 +96,7 @@
     <div class="mount-info">
       <p id="mount-conn" class="mount-conn">Checking mount…</p>
       <p id="mount-readout" class="mount-readout" hidden></p>
-      <p id="mount-connected-only" class="hint" hidden>Hold N/S/E/W on the preview to move the mount at the speed shown top-left. Zero (bottom-left) slews to the zero position; Stop halts everything, including that slew.</p>
+      <p id="mount-connected-only" class="hint" hidden>Hold N/S/E/W on the preview to move the mount at the speed shown top-left. Once the star is framed, tap Track (top-right) and the mount turns with the sky to keep it there; nudging it back to center keeps tracking on. Zero (bottom-left) slews to the zero position. Stop halts moves and slews but leaves tracking on — tap Tracking to turn it off.</p>
     </div>
 
     <label class="checkbox"><input type="checkbox" id="crosshair-toggle"> Show center crosshair</label>
@@ -357,6 +358,9 @@
 
     const mountConn = document.getElementById("mount-conn");
     const mountConnectedOnly = document.getElementById("mount-connected-only");
+    const mountTrackBtn = document.getElementById("mount-track");
+    let mountTrackingOn = false;
+    let mountTrackBusy = false;
     const mountOverlay = document.getElementById("mount-overlay");
     const mountReadout = document.getElementById("mount-readout");
     const mountErrors = document.querySelectorAll(".mount-error");
@@ -403,6 +407,9 @@
       mountRateSelects.forEach((sel) => {
         if (d.rate && document.activeElement !== sel) sel.value = d.rate;
       });
+      // While a nudge or slew is running the mount reports "Slewing", not
+      // whether tracking will resume, so keep the button as it was.
+      if (!d.moving && !mountTrackBusy) showTracking(!!d.tracking_on);
     }
 
     async function refreshMountStatus() {
@@ -483,6 +490,27 @@
       });
     });
 
+    function showTracking(on) {
+      mountTrackingOn = on;
+      mountTrackBtn.classList.toggle("on", on);
+      mountTrackBtn.textContent = on ? "Tracking" : "Track";
+      mountTrackBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+
+    mountTrackBtn.addEventListener("click", async () => {
+      const want = !mountTrackingOn;
+      mountTrackBusy = true;
+      try {
+        await mountPost("{{ url_for('mount_track') }}", { on: want });
+        showTracking(want);
+        showMountError("");
+      } catch (e) {
+        showMountError(e.message);
+      } finally {
+        mountTrackBusy = false;
+      }
+    });
+
     document.getElementById("mount-zero").addEventListener("click", async () => {
       if (!confirm("Slew the mount to its zero position (counterweight down, pointing at the pole)? Press Stop to halt it.")) return;
       try {
@@ -494,6 +522,46 @@
     });
 
     setInterval(refreshMountStatus, 2000);
+
+    // Keep the phone's screen on while the dashboard is open, so it doesn't
+    // lock partway through a long sequence or while tracking a star.
+    // The Wake Lock API only exists on secure (https/localhost) pages, and
+    // this one is plain http (http://4.3.2.1, http://<host>.local), so on
+    // most phones the fallback does the work: a tiny looping video with a
+    // silent audio track (static/keep-awake.mp4), which phones keep the
+    // screen on for, as NoSleep.js does. Starting a video with sound needs
+    // a tap, so every tap retries until it's running; the browser pauses it
+    // (and drops a wake lock) when the page is hidden, so coming back
+    // retries too.
+    (function keepScreenAwake() {
+      let lock = null;
+      const video = document.createElement("video");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("title", "Keep screen awake");
+      video.loop = true;
+      video.src = "{{ url_for('static', filename='keep-awake.mp4') }}";
+
+      async function acquire() {
+        if (document.visibilityState !== "visible") return;
+        if ("wakeLock" in navigator) {
+          if (lock) return;
+          try {
+            lock = await navigator.wakeLock.request("screen");
+            lock.addEventListener("release", () => { lock = null; });
+            return;
+          } catch (e) {
+            // e.g. battery saver refused it — fall back to the video
+          }
+        }
+        if (video.paused) video.play().catch(() => {});
+      }
+
+      document.addEventListener("visibilitychange", acquire);
+      for (const ev of ["pointerdown", "click", "touchend"]) {
+        document.addEventListener(ev, acquire, { capture: true, passive: true });
+      }
+      acquire();
+    })();
     refreshMountStatus();
 
     const powerMenu = document.querySelector(".power-menu");

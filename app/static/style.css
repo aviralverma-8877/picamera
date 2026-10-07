@@ -434,6 +434,19 @@ button:disabled { opacity: 0.55; }
   background: rgba(192, 57, 43, 0.85);
   font-size: 0.85rem;
 }
+.ov-track {
+  top: 6px;
+  right: 6px;
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(22, 24, 29, 0.7);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+}
+.ov-track.on { background: rgba(46, 157, 91, 0.9); border-color: transparent; color: #fff; }
 .ov-zero {
   left: 6px;
   bottom: 6px;
