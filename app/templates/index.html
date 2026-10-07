@@ -23,6 +23,11 @@
           <circle cx="12" cy="20" r="0.9" fill="currentColor"></circle>
         </svg>
       </a>
+      <a href="{{ url_for('bluetooth_page') }}" aria-label="Bluetooth (mount)" title="Bluetooth (mount)">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 7l10 10-5 5V2l5 5L7 17"></path>
+        </svg>
+      </a>
       <a href="{{ url_for('gallery') }}">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="13" height="13" rx="2"></rect>
@@ -79,6 +84,34 @@
     <p class="hint">Zoom crops the sensor itself (not just the preview image) for real extra detail on a small star — useful for picking out a Bahtinov mask's diffraction spikes. Preview only; captures always use the full frame.</p>
 
     <p class="hint">Live preview — pauses automatically while a sequence is running.</p>
+  </section>
+
+  <section class="card" id="mount-card">
+    <div class="card-header">
+      <h2>Mount</h2>
+      <a href="{{ url_for('bluetooth_page') }}" class="button-link">Bluetooth</a>
+    </div>
+    <p id="mount-conn" class="hint">Checking mount…</p>
+    <p id="mount-error" class="hint warning" hidden></p>
+    <fieldset id="mount-controls" class="mount-controls" disabled>
+      <p id="mount-readout" class="mount-readout" hidden></p>
+      <label>Slew speed
+        <select id="mount-rate">
+          {% for rate in slew_rates %}
+            <option value="{{ loop.index }}">{{ rate }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="dpad">
+        <button type="button" class="dpad-n" data-dir="n">N</button>
+        <button type="button" class="dpad-e" data-dir="e">E</button>
+        <button type="button" class="dpad-stop danger" id="mount-stop">Stop</button>
+        <button type="button" class="dpad-w" data-dir="w">W</button>
+        <button type="button" class="dpad-s" data-dir="s">S</button>
+      </div>
+      <p class="hint">Hold a direction to move at the slew speed; release to stop. Stop halts everything, including a go-to-zero slew.</p>
+      <button type="button" id="mount-zero" class="secondary">Go to zero position</button>
+    </fieldset>
   </section>
 
   <section class="card">
@@ -327,6 +360,136 @@
 
     setInterval(refreshNetworkStatus, 5000);
     refreshNetworkStatus();
+
+    const mountConn = document.getElementById("mount-conn");
+    const mountError = document.getElementById("mount-error");
+    const mountControls = document.getElementById("mount-controls");
+    const mountReadout = document.getElementById("mount-readout");
+    const mountRate = document.getElementById("mount-rate");
+    let mountHold = null;            // direction being held, e.g. "n"
+    let mountHoldTimer = null;
+    let mountMoveInFlight = Promise.resolve();
+
+    function showMountError(text) {
+      mountError.textContent = text;
+      mountError.hidden = !text;
+    }
+
+    async function mountPost(url, body) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    }
+
+    function applyMountStatus(d) {
+      mountControls.disabled = !d.connected;
+      if (!d.connected) {
+        mountConn.textContent = d.reconnecting
+          ? `Lost the connection to "${d.name}" — reconnecting…`
+          : "No mount connected — connect its Bluetooth adapter to enable the controls.";
+        mountReadout.hidden = true;
+        endMountHold();
+        return;
+      }
+      if (d.mount_ok === false) {
+        mountConn.textContent = `Connected to "${d.name}", but the mount isn't answering — is it powered on and cabled to the adapter?`;
+        mountReadout.hidden = true;
+        return;
+      }
+      mountConn.textContent = `Connected to "${d.name}".`;
+      mountReadout.textContent = `${d.state} · ${d.tracking}  —  RA ${d.ra}   Dec ${d.dec}`;
+      mountReadout.hidden = false;
+      if (d.rate && document.activeElement !== mountRate) mountRate.value = d.rate;
+    }
+
+    async function refreshMountStatus() {
+      try {
+        const res = await fetch("{{ url_for('mount_status') }}", { cache: "no-store" });
+        applyMountStatus(await res.json());
+      } catch (e) {
+        mountConn.textContent = "Mount status unavailable.";
+      }
+    }
+
+    // Holding a direction sends /mount/move every 250ms; the Pi stops the
+    // axis by itself if those stop arriving (see mount.MOVE_HOLD_S), so a
+    // dropped connection can't leave the mount slewing. Moves are sent one
+    // at a time, and the stop waits for the last one, so a late move can't
+    // restart the mount after its stop.
+    function sendMountMove(direction) {
+      mountMoveInFlight = mountMoveInFlight.then(() =>
+        mountPost("{{ url_for('mount_move') }}", { direction }).catch((e) => {
+          showMountError(e.message);
+          endMountHold();
+        })
+      );
+    }
+
+    function startMountHold(direction, button) {
+      endMountHold();
+      showMountError("");
+      mountHold = direction;
+      button.classList.add("active");
+      sendMountMove(direction);
+      mountHoldTimer = setInterval(() => sendMountMove(direction), 250);
+    }
+
+    function endMountHold() {
+      if (!mountHold) return;
+      const axis = mountHold === "n" || mountHold === "s" ? "dec" : "ra";
+      mountHold = null;
+      clearInterval(mountHoldTimer);
+      document.querySelectorAll(".dpad button.active").forEach((b) => b.classList.remove("active"));
+      mountMoveInFlight = mountMoveInFlight.then(() =>
+        mountPost("{{ url_for('mount_stop') }}", { axis }).catch((e) => showMountError(e.message))
+      );
+    }
+
+    document.querySelectorAll(".dpad [data-dir]").forEach((button) => {
+      button.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        button.setPointerCapture(e.pointerId);
+        startMountHold(button.dataset.dir, button);
+      });
+      for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) {
+        button.addEventListener(ev, endMountHold);
+      }
+      button.addEventListener("contextmenu", (e) => e.preventDefault());
+    });
+    window.addEventListener("blur", endMountHold);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) endMountHold(); });
+
+    document.getElementById("mount-stop").addEventListener("click", () => {
+      endMountHold();
+      mountMoveInFlight = mountMoveInFlight.then(() =>
+        mountPost("{{ url_for('mount_stop') }}", {}).catch((e) => showMountError(e.message))
+      );
+    });
+
+    mountRate.addEventListener("change", async () => {
+      try {
+        await mountPost("{{ url_for('mount_rate') }}", { rate: Number(mountRate.value) });
+        showMountError("");
+      } catch (e) {
+        showMountError(e.message);
+      }
+    });
+
+    document.getElementById("mount-zero").addEventListener("click", async () => {
+      if (!confirm("Slew the mount to its zero position (counterweight down, pointing at the pole)? Press Stop to halt it.")) return;
+      try {
+        await mountPost("{{ url_for('mount_zero') }}");
+        showMountError("");
+      } catch (e) {
+        showMountError(e.message);
+      }
+    });
+
+    setInterval(refreshMountStatus, 2000);
+    refreshMountStatus();
 
     const powerMenu = document.querySelector(".power-menu");
     const powerOverlay = document.getElementById("power-overlay");

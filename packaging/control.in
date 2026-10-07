@@ -3,7 +3,7 @@ Version: @VERSION@
 Section: misc
 Priority: optional
 Architecture: all
-Depends: python3-picamera2, python3-flask, python3-pil, network-manager, dnsmasq-base, avahi-daemon, sudo
+Depends: python3-picamera2, python3-flask, python3-pil, network-manager, dnsmasq-base, avahi-daemon, bluez, rfkill, sudo
 Maintainer: Aviral Verma <aviral.verma.8877@gmail.com>
 Homepage: https://github.com/aviralverma-8877/picamera
 Description: Standalone WiFi-AP astrophotography camera controller
@@ -12,7 +12,8 @@ Description: Standalone WiFi-AP astrophotography camera controller
  style onboarding, or joins a known network automatically at home.
  Manual exposure/ISO capture sequences, named/appendable sessions, a
  live focusing preview with digital zoom and center crosshair, raw DNG
- capture, and a gallery with per-image/session download and delete.
+ capture, a gallery with per-image/session download and delete, and
+ telescope mount control over Bluetooth (iOptron, via an SPP adapter).
  .
  Assumes the standard Raspberry Pi OS "pi" user; installs the app under
  that user's home directory and runs it as that user.

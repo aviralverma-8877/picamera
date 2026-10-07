@@ -362,3 +362,60 @@ button:disabled { opacity: 0.55; }
   border-radius: 6px;
   background: #0f1115;
 }
+.bt-address {
+  color: #6b7076;
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+}
+.bt-controls-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+}
+.button-row > button { flex: 1; }
+.mount-controls {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+.mount-controls:disabled { opacity: 0.45; }
+.mount-readout {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: #c9cdd2;
+}
+/* N on top, S at the bottom, E left and W right (the sky seen facing
+   south), Stop in the middle. Big targets: this gets used in the dark. */
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-areas:
+    ".    n    ."
+    "e    stop w"
+    ".    s    .";
+  gap: 0.5rem;
+  max-width: 280px;
+  margin: 0.25rem auto 0;
+}
+.dpad button {
+  margin: 0;
+  min-height: 64px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  /* Press-and-hold: no scrolling, text selection or long-press menu. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.dpad .dpad-n { grid-area: n; }
+.dpad .dpad-s { grid-area: s; }
+.dpad .dpad-e { grid-area: e; }
+.dpad .dpad-w { grid-area: w; }
+.dpad .dpad-stop { grid-area: stop; font-size: 0.95rem; }
+.dpad button.active { background: #7fd1ff; color: #0b0c10; }

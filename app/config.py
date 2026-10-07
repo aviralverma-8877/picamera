@@ -75,3 +75,10 @@ STA_MODE_SCRIPT = DEPLOY_DIR / "sta-mode.sh"
 # attempt here, readable by the app's unprivileged user.
 WIFI_SCRIPT = DEPLOY_DIR / "wifi.sh"
 WIFI_RESULT_FILE = Path("/run/astro-pi-cam/wifi-result")
+
+# Telescope mount over Bluetooth (see mount.py). rfkill lifts the radio's
+# boot-time block — the one step that needs root, via the sudoers rule.
+RFKILL = "/usr/sbin/rfkill"
+# The last mount adapter connected to, so it can be reconnected in one tap
+# without scanning (it stays reachable by address).
+MOUNT_DEVICE_FILE = APP_DIR / "mount-device.json"

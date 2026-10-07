@@ -28,6 +28,11 @@ exposure sequences through a small web UI.
   to a new network, or get it off its hotspot onto one, without SSH. A
   failed join (e.g. wrong password) falls back to the previous network or
   the hotspot, and says why.
+- **Telescope mount control over Bluetooth** — connect an iOptron mount
+  through the ESP32 `SmartEQ-RJ9` adapter from a Bluetooth page, then nudge
+  it from the dashboard right next to the live preview: hold-to-move
+  N/S/E/W buttons, slew speed (1x–Max), Stop, and Go to zero position.
+  Moves stop by themselves if the phone drops off mid-press.
 - **Connects like public WiFi** — joining the `AstroCamera` AP pops up a
   "sign in to this network" prompt straight to the dashboard, the same way
   a hotel or café hotspot does, instead of needing to know to open a

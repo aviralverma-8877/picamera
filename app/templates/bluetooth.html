@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astro Pi Camera — Bluetooth</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Bluetooth</h1>
+    <nav>
+      <a href="{{ url_for('index') }}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"></path>
+        </svg>
+        Back
+      </a>
+    </nav>
+  </header>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Mount adapter</h2>
+      <button type="button" id="bt-scan-btn" class="small">Scan</button>
+    </div>
+    <p id="bt-current" class="hint">Checking…</p>
+    <p id="bt-error" class="hint warning" hidden></p>
+    <p id="bt-scan-note" class="hint" hidden></p>
+    <ul id="bt-list" class="wifi-list"></ul>
+    <div id="bt-connected-actions" class="button-row" hidden>
+      <button type="button" id="bt-disconnect-btn" class="secondary">Disconnect</button>
+      <a href="{{ url_for('index') }}#mount-card" class="button-link bt-controls-link">Mount controls</a>
+    </div>
+    <p class="hint">Pick the mount's Bluetooth adapter (e.g. "SmartEQ-RJ9"). Once connected, the mount controls on the dashboard are enabled. The adapter takes one connection at a time, so a phone app (SkySafari, iOptron Commander…) can't use it while the camera is connected.</p>
+  </section>
+
+  <script>
+    const btScanBtn = document.getElementById("bt-scan-btn");
+    const btCurrent = document.getElementById("bt-current");
+    const btError = document.getElementById("bt-error");
+    const btScanNote = document.getElementById("bt-scan-note");
+    const btList = document.getElementById("bt-list");
+    const btConnectedActions = document.getElementById("bt-connected-actions");
+    let btBusy = false;  // a connect/disconnect is in progress
+    let btDevices = [];
+
+    function showError(text) {
+      btError.textContent = text;
+      btError.hidden = !text;
+    }
+
+    function tag(text) {
+      const el = document.createElement("span");
+      el.className = "wifi-tag";
+      el.textContent = text;
+      return el;
+    }
+
+    function applyStatus(data) {
+      if (data.connected) {
+        btCurrent.textContent = `Connected to "${data.name}".` +
+          (data.mount_ok === false ? " The adapter answers, but the mount behind it doesn't — is it powered on and cabled?" : "");
+      } else if (data.reconnecting) {
+        btCurrent.textContent = `Lost the connection to "${data.name}" — reconnecting…`;
+      } else {
+        btCurrent.textContent = "Not connected to a mount.";
+      }
+      btConnectedActions.hidden = !data.connected;
+      for (const d of btDevices) d.connected = data.connected && d.address === data.address;
+      renderList();
+    }
+
+    async function refreshStatus() {
+      if (btBusy) return;
+      try {
+        const res = await fetch("{{ url_for('mount_status') }}", { cache: "no-store" });
+        applyStatus(await res.json());
+      } catch (e) {
+        btCurrent.textContent = "Status unavailable.";
+      }
+    }
+
+    function renderList() {
+      btList.replaceChildren();
+      for (const d of btDevices) {
+        const li = document.createElement("li");
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "wifi-row";
+        const name = document.createElement("span");
+        name.className = "wifi-name";
+        name.textContent = d.name;
+        row.appendChild(name);
+        if (d.connected) row.appendChild(tag("Connected"));
+        else if (d.last_used) row.appendChild(tag("Last used"));
+        const addr = document.createElement("span");
+        addr.className = "bt-address";
+        addr.textContent = d.address;
+        row.appendChild(addr);
+        row.disabled = d.connected || btBusy;
+        row.addEventListener("click", () => connect(d));
+        li.appendChild(row);
+        btList.appendChild(li);
+      }
+    }
+
+    async function loadDevices(scan) {
+      const url = "{{ url_for('bluetooth_devices') }}" + (scan ? "?scan=1" : "");
+      const res = await fetch(url, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scan failed");
+      btDevices = data.devices;
+      renderList();
+    }
+
+    async function scan() {
+      btScanBtn.disabled = true;
+      btScanBtn.textContent = "Scanning…";
+      btScanNote.hidden = true;
+      showError("");
+      try {
+        await loadDevices(true);
+        if (!btDevices.length) {
+          btScanNote.textContent = "No Bluetooth devices found. Is the mount adapter powered on?";
+          btScanNote.hidden = false;
+        }
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        btScanBtn.disabled = false;
+        btScanBtn.textContent = "Scan";
+      }
+    }
+
+    async function connect(device) {
+      btBusy = true;
+      showError("");
+      renderList();
+      btCurrent.textContent = `Connecting to "${device.name}"…`;
+      try {
+        const res = await fetch("{{ url_for('bluetooth_connect') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: device.address, name: device.name }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        // Picks up the "Last used" tag; refreshStatus() below marks it connected.
+        await loadDevices(false).catch(() => {});
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        btBusy = false;
+        refreshStatus();
+      }
+    }
+
+    document.getElementById("bt-disconnect-btn").addEventListener("click", async () => {
+      btBusy = true;
+      try {
+        await fetch("{{ url_for('bluetooth_disconnect') }}", { method: "POST" });
+      } finally {
+        btBusy = false;
+        refreshStatus();
+      }
+    });
+
+    btScanBtn.addEventListener("click", scan);
+
+    // The last-used adapter shows up straight away (it can be reconnected
+    // without scanning); the scan fills in the rest.
+    loadDevices(false).then(refreshStatus).catch(() => {}).finally(scan);
+    setInterval(refreshStatus, 5000);
+  </script>
+</body>
+</html>

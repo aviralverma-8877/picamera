@@ -87,11 +87,12 @@ sh deploy/setup_sudoers.sh
 
 Installs a sudoers.d rule granting the `pi` user passwordless `sudo` for
 exactly `deploy/ap-mode.sh`, `deploy/sta-mode.sh`, `deploy/wifi.sh scan`,
-`deploy/wifi.sh connect`, `systemctl reboot`, and `systemctl poweroff` —
-nothing else (sudoers matches the arguments too, so this doesn't open up
-`systemctl` in general). This is what lets the web page's WiFi toggle, WiFi
-networks card and power menu (see below) work without the app needing a
-stored root password. Re-run it after updating an existing device with
+`deploy/wifi.sh connect`, `rfkill unblock bluetooth`, `systemctl reboot`,
+and `systemctl poweroff` — nothing else (sudoers matches the arguments
+too, so this doesn't open up `systemctl` or `rfkill` in general). This is
+what lets the web page's WiFi toggle, WiFi networks card, Bluetooth page
+and power menu (see below) work without the app needing a stored root
+password. Re-run it after updating an existing device with
 `deploy.py` to a version that adds commands to the rule (the `.deb` re-runs
 it on every upgrade by itself). The rule is validated with `visudo -c` before being
 installed.
@@ -207,6 +208,40 @@ dependency).
 ```sh
 sh deploy/ap-mode.sh    # go into the field: hosts "AstroCamera" AP, drops SSH over wlan0
 sh deploy/sta-mode.sh   # back home: joins the best saved network in range (falls back to the AP if none)
+```
+
+## Controlling the telescope mount over Bluetooth
+
+Works with an iOptron mount through the ESP32 `SmartEQ-RJ9` adapter
+(github.com/aviralverma-8877/esp32-ioptron_smart_eq_controller), which
+passes a Classic Bluetooth serial port straight through to the mount's
+RS-232 port.
+
+1. Power the mount and the adapter.
+2. Dashboard → Bluetooth icon in the nav bar (or the "Bluetooth" button
+   on the Mount card) → the page scans by itself (~8s) → tap
+   `SmartEQ-RJ9`. The first connection bonds with it (no PIN; ~30s
+   including a scan). After that it's listed as "Last used" straight away
+   and connects in a couple of seconds. If the adapter is reflashed, the
+   app notices the stale bond and pairs again by itself.
+3. Back on the dashboard, the Mount card is enabled: slew speed (1x–Max),
+   N/S/E/W hold-to-move buttons, Stop, and Go to zero position.
+
+Nothing to set up by hand: the image boots with Bluetooth rfkill-blocked,
+and the app lifts the block itself through the sudoers rule above. The
+adapter takes one connection at a time, so disconnect on the Bluetooth
+page before using a phone app (SkySafari, iOptron Commander) with it. If
+the link drops (adapter power blip, out of range), the app reconnects by
+itself for up to 2 minutes, and the Mount card shows "reconnecting…"
+meanwhile. The connection doesn't survive an app restart or reboot —
+reconnect from the Bluetooth page.
+
+From SSH, the same link can be checked without the app (use the address
+`bluetoothctl devices` shows for `SmartEQ-RJ9`; the mount should answer
+`0011` for a SmartEQ Pro):
+
+```sh
+python3 -c "import socket, time; s=socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM); s.settimeout(10); s.connect(('<adapter address>', 1)); s.sendall(b':MountInfo#'); time.sleep(0.5); print(s.recv(16))"
 ```
 
 ## Rebooting / shutting down from the web UI

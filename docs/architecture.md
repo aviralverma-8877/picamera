@@ -24,9 +24,12 @@ app/
   capture_session.py  CaptureSession: background thread running N exposures
                        at a fixed interval, exposes polls-able status
   config.py           Defaults/limits, captures directory
-  templates/           index.html (control form + live status),
+  mount.py            MountLink: Bluetooth (RFCOMM) link to the telescope
+                       mount's adapter, iOptron commands, move watchdog
+  templates/           index.html (control form + live status + mount card),
                        gallery.html (browse/download past sessions),
-                       wifi.html (scan for / join WiFi networks)
+                       wifi.html (scan for / join WiFi networks),
+                       bluetooth.html (scan for / connect the mount adapter)
   static/style.css    mobile-first styling
 
 deploy/
@@ -267,6 +270,68 @@ packaging/
   client-side — it's drawn on top of the `<img>` in CSS, not baked into the
   video frames, so it stays perfectly centered regardless of zoom level and
   costs nothing on the Pi side.
+
+- **Mount control over Bluetooth, through the ESP32 `SmartEQ-RJ9`
+  adapter, using a plain RFCOMM socket**: the adapter
+  (esp32-ioptron_smart_eq_controller) is a Classic Bluetooth serial port
+  that copies bytes to and from the mount's RS-232 port unchanged, so
+  `mount.py` speaks the iOptron command set directly. Python's own
+  `socket.AF_BLUETOOTH`/`BTPROTO_RFCOMM` does the connection — no new
+  package, no `rfcomm` device node, and no root: RFCOMM sockets are open
+  to any user, and BlueZ pairs the adapter on the first connect by itself
+  (Just Works, no PIN). Its SPP service is on channel 1, used directly
+  rather than looked up via SDP (`sdptool` is gone from current BlueZ).
+  Scanning is `bluetoothctl scan bredr` — Classic only, since the adapter
+  is Classic-only and a dual scan buries it under unnamed BLE beacons.
+  The one root step is lifting the radio's rfkill block (the stock image
+  boots with Bluetooth blocked), added to the sudoers rule as exactly
+  `rfkill unblock bluetooth`.
+- **The connection lives in the app, not the browser**: one `MountLink`
+  shared by every page, so the Bluetooth page connects it and the
+  dashboard's Mount card (next to the preview, so framing and nudging
+  happen on one screen) uses it. A lock serializes commands, since the
+  mount answers one at a time; before each command any stray buffered
+  bytes are discarded, so a late reply can never be read as the answer to
+  the next command.
+- **The adapter is bonded on first connect, so BlueZ keeps it**: BlueZ
+  registers anything a scan finds as a *temporary* device and deletes it
+  30s after a scan last saw it (`TemporaryTimeout`) — and deleting it
+  tears down a live connection too. Connecting the RFCOMM socket pairs
+  but doesn't bond (the Pi's adapter boots non-pairable, and then BlueZ
+  pairs without storing keys), so the adapter stayed temporary and every
+  scan — the Bluetooth page runs one when opened — cost a disconnect
+  ~25-30s later. Trusting the device doesn't prevent it; a bond does. So
+  `_ensure_bonded` (once per adapter, skipped when already bonded):
+  pairable on, a scan if BlueZ doesn't currently know the device, `pair`
+  with a NoInputNoOutput agent (Just Works), pairable off again so
+  nothing else nearby can pair. The bond is stored by BlueZ and survives
+  reboots. Reflashing the adapter wipes its side of the bond, so a
+  connect that fails with a stored bond removes it, re-pairs and retries
+  once. Connects also wait for any running scan (same lock), so even an
+  unbonded link (if bonding failed) isn't made mid-scan.
+- **Reconnect after unexpected drops**: adapter power blip, out of range.
+  The watchdog notices a closed socket within 0.1s even while idle, and
+  a background thread reconnects every 5s for up to 2 minutes, unless the
+  user pressed Disconnect.
+- **Moves only last while the button is held, enforced on the Pi**: the
+  page sends `/mount/move` every 250ms while a direction is held and
+  `/mount/stop` on release, but a release event can be lost (phone
+  locks, WiFi drops, the network is switched). So the Pi treats each move
+  as a lease: a watchdog thread stops that axis (`:qR#`/`:qD#`) once 1s
+  passes without a renewal. Renewals don't resend the move command, and
+  the page sends moves and the final stop strictly in order, so a
+  late-arriving move can't restart the mount after its stop.
+- **Command set, as checked against a SmartEQ Pro (`:V#` → `V1.00`)**:
+  `:mn#`/`:ms#`/`:me#`/`:mw#` move at the current slew rate (no reply on
+  this mount); `:qD#`/`:qR#` stop one axis and `:q#` stops everything,
+  including a go-to-zero slew (each replies `1`); `:SR1#`–`:SR9#` set the
+  slew rate 1x/2x/8x/16x/64x/128x/256x/512x/Max (reply `1`; the rate is
+  also digit 4 of `:GAS#`); `:MH#` slews to the zero position (reply
+  `1`). Status is `:GAS#` (state, tracking rate, slew rate) and `:GEC#`
+  (Dec and RA in 0.01 arc-seconds). E/W follow the mount's own naming
+  (`:me#` for E, as iOptron's software does); on the test mount `:me#`
+  lowered the reported RA, i.e. turned the scope toward the western sky,
+  so if E/W feel reversed in the field, that's the mount's convention.
 
 ## Capture flow
 

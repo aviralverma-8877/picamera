@@ -6,3 +6,4 @@ app/captures/
 .DS_Store
 Thumbs.db
 *.deb
+app/mount-device.json

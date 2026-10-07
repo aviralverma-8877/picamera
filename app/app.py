@@ -14,6 +14,7 @@ from pathlib import Path
 from flask import Flask, Response, after_this_request, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 
 import config
+import mount as mount_link
 from camera import AstroCamera
 from capture_session import CaptureSession
 
@@ -22,6 +23,7 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 camera = AstroCamera()
+mount = mount_link.MountLink()
 current_session = None
 # Remembered so the "Rotate 180°" box (and the preview's orientation) stay
 # as set after starting a sequence reloads the page.
@@ -77,6 +79,7 @@ def index():
         "index.html",
         status=status,
         iso_options=config.ISO_SELECT_OPTIONS,
+        slew_rates=mount_link.SLEW_RATES,
         min_zoom=config.MIN_ZOOM,
         max_zoom=config.MAX_ZOOM,
         existing_sessions=_list_session_names(),
@@ -529,6 +532,92 @@ def wifi_status():
     at = int(at) if at.isdigit() else None
     age = int(time.time()) - at if at is not None else None
     return jsonify({"state": state, "ssid": ssid, "message": message, "at": at, "age": age})
+
+
+@app.route("/bluetooth")
+def bluetooth_page():
+    return render_template("bluetooth.html")
+
+
+@app.route("/bluetooth/devices")
+def bluetooth_devices():
+    """Nearby named Classic Bluetooth devices (?scan=1 runs a fresh ~8s scan;
+    without it, whatever BlueZ already knows), plus the last mount adapter
+    used, which can be reconnected without scanning."""
+    devices = []
+    if request.args.get("scan") == "1":
+        try:
+            devices = mount_link.scan_devices()
+        except mount_link.MountError as exc:
+            return jsonify({"error": str(exc)}), 500
+    last = mount_link.load_last_device()
+    if last and not any(d["address"] == last["address"] for d in devices):
+        devices.insert(0, last)
+    for d in devices:
+        d["last_used"] = bool(last) and d["address"] == last["address"]
+        d["connected"] = mount.connected and d["address"] == mount.address
+    return jsonify({"devices": devices})
+
+
+@app.route("/bluetooth/connect", methods=["POST"])
+def bluetooth_connect():
+    data = request.get_json(silent=True) or {}
+    try:
+        mount.connect(str(data.get("address", "")), str(data.get("name", ""))[:64])
+    except ValueError as exc:
+        return str(exc), 400
+    except mount_link.MountError as exc:
+        return str(exc), 502
+    return jsonify(mount.status())
+
+
+@app.route("/bluetooth/disconnect", methods=["POST"])
+def bluetooth_disconnect():
+    mount.disconnect()
+    return jsonify({"connected": False})
+
+
+def _mount_action(action):
+    try:
+        action()
+    except ValueError as exc:
+        return str(exc), 400
+    except mount_link.MountError as exc:
+        return str(exc), 409 if not mount.connected else 502
+    return jsonify({"ok": True})
+
+
+@app.route("/mount/status")
+def mount_status():
+    return jsonify(mount.status())
+
+
+@app.route("/mount/move", methods=["POST"])
+def mount_move():
+    # Sent every 250ms while a direction button is held: the first starts
+    # the move, the rest keep it alive (see mount.MOVE_HOLD_S).
+    direction = str((request.get_json(silent=True) or {}).get("direction", ""))
+    return _mount_action(lambda: mount.move(direction))
+
+
+@app.route("/mount/stop", methods=["POST"])
+def mount_stop():
+    axis = (request.get_json(silent=True) or {}).get("axis")
+    return _mount_action(lambda: mount.stop(axis))
+
+
+@app.route("/mount/rate", methods=["POST"])
+def mount_rate():
+    try:
+        rate = int((request.get_json(silent=True) or {}).get("rate", 0))
+    except (TypeError, ValueError):
+        return "Invalid slew rate", 400
+    return _mount_action(lambda: mount.set_rate(rate))
+
+
+@app.route("/mount/zero", methods=["POST"])
+def mount_zero():
+    return _mount_action(mount.goto_zero)
 
 
 def _power_action(systemctl_verb):

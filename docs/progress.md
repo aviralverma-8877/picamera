@@ -1034,3 +1034,141 @@ first): installed cleanly; both services active; `postinst` re-ran
 a manual step; `deploy/wifi.sh` is now owned by the package; the Pi
 stayed on `TATA_3071` throughout. After the upgrade `/wifi` serves and
 `/wifi/scan` does a live scan (8 networks, `TATA_3071` in use).
+
+## 2026-10-07 — Telescope mount control over Bluetooth
+
+Asked for: a Bluetooth section like the WiFi one — scan for a device and
+connect to it — after which mount control buttons, slew speed and a
+"reset to zero" button are enabled on the dashboard. The mount is an
+iOptron SmartEQ Pro behind the ESP32 `SmartEQ-RJ9` adapter (the
+`esp32-ioptron_smart_eq_controller` project), a transparent Bluetooth
+SPP ⇄ RS-232 bridge.
+
+- `app/mount.py` (new): `MountLink`, an RFCOMM socket to the adapter
+  (channel 1) shared by every page, with the iOptron moves, stops, slew
+  rate, go-to-zero and `:GAS#`/`:GEC#` status; a watchdog stops any
+  move whose button stopped being held (1s lease, renewed every 250ms by
+  the page). Scanning is `bluetoothctl scan bredr`.
+- `/bluetooth` page (new, nav-bar icon): last-used adapter listed
+  instantly, ~8s scan for the rest, tap to connect, Disconnect.
+- Dashboard "Mount" card, under the preview: status line (state,
+  tracking, RA/Dec), slew speed 1x–Max, N/S/E/W hold-to-move pad with
+  Stop in the middle, Go to zero position (with a confirm). Disabled
+  until a mount is connected.
+- `deploy/setup_sudoers.sh`: adds exactly `rfkill unblock bluetooth` —
+  the test Pi boots with Bluetooth rfkill-blocked, and that's the only
+  step needing root. `packaging/control.in` now depends on `bluez` and
+  `rfkill`.
+- "Reset to zero" is implemented as **go to the zero position** (`:MH#`),
+  not "set the current position as zero" (`:SZP#`), which would silently
+  corrupt the mount's alignment if pressed by mistake.
+
+### Verified live on 192.168.1.35 (real mount, moved with the owner's OK)
+
+- Before writing code, by hand over RFCOMM as the unprivileged `pi`
+  user: connected on channel 1 in ~1.4s, BlueZ paired by itself;
+  `:MountInfo#` → `0011`, `:V#` → `V1.00#`; `:SRn#`, `:qR#`, `:qD#`,
+  `:q#` each reply `1`. A connect also works when BlueZ has forgotten the
+  device (it isn't bonded), which is what makes one-tap reconnect work.
+- Deployed with `deploy.py`, re-ran `setup_sudoers.sh`. With the sudo
+  cache cleared (`sudo -k` — this image sets `timestamp_type=global`, so
+  an earlier interactive sudo would otherwise mask the rule): `rfkill
+  unblock bluetooth` allowed, `rfkill block bluetooth` refused.
+- Through the app's HTTP API, starting from Bluetooth blocked and
+  powered off: scan unblocked it, powered it on and listed
+  `SmartEQ-RJ9` (~9s); connect 1.7s; status decoded (Stopped, Sidereal,
+  64x, RA/Dec); rate changes show up in `:GAS#`; bad rate/direction → 400.
+- Motion, at 8x, 1.5s holds with 250ms renewals: N raised Dec
+  (+66°56′24″ → +67°00′01″), S brought it back; E and W each moved RA
+  ~10s beyond the normal drift, in opposite directions; each stop
+  replied OK and the state went Slewing → Stopped.
+- Watchdog: a single move with no renewal and no stop — Slewing at
+  +0.4s, Stopped by +1.6s.
+- Go to zero: Slewing for ~15s, ending at Dec +90°00′00″, state "At zero
+  position". Slew rate set back to 64x afterwards; the mount was left at
+  its zero position and the app left connected to it.
+- Both pages' inline scripts pass `node --check`; `MountLink` was also
+  exercised locally against a fake mount on a socketpair (single move
+  command per hold, stop ~1s after the last renewal, a stray `1` after a
+  move not taken as the next reply, link loss detected).
+
+### Not yet done
+
+- The pages haven't been looked at in a real phone browser (no browser
+  on the dev machine): the D-pad layout, and press-and-hold behaviour on
+  touch (`touch-action: none`, pointer capture).
+- E/W sense: `:me#` lowered the reported RA on this mount (scope turned
+  toward the western sky). Kept as the mount's own naming; confirm in the
+  field whether the labels feel right.
+- No automatic reconnect after an app restart or reboot.
+
+## 2026-10-07 — Fixed: mount Bluetooth dropping ~30s after connecting
+
+Reported: "Bluetooth keeps disconnecting after some time". The app log
+had `Mount link lost: [Errno 103] Software caused connection abort` 29s
+after the connect — the Pi's own stack closing the link, not the
+adapter.
+
+Reproduced on the test Pi through the app's API:
+
+- Connect *while a scan is running* (what the Bluetooth page does when
+  you tap the adapter within ~8s of opening it): dropped after 29s, every
+  time.
+- Connect right after a scan, or 15s after one: still up after 92s / 61s.
+- `bluetoothctl trust` after connecting: still dropped (28s).
+- Explicit `bluetoothctl --agent NoInputNoOutput pair`: "Pairing
+  successful", then `Paired: no` the moment the link closed — the
+  adapter's pairing doesn't bond, so bonding can't be the fix.
+
+Cause: BlueZ deletes a scan-discovered device 30s after it was last seen
+(`TemporaryTimeout`, default 30), and a connection made mid-scan never
+makes it permanent; deleting the device takes the link with it.
+
+Fix (`app/mount.py`): connecting now takes the scan lock, so it waits for
+a running scan to finish. Plus, for drops with other causes, the watchdog
+detects a closed socket within 0.1s even while idle, and the app
+reconnects in the background every 5s for up to 2 minutes (not after the
+user's own Disconnect); the Mount card and Bluetooth page show
+"reconnecting…".
+
+### Verified live on 192.168.1.35
+
+- The failing scenario again (connect requested 3s into a scan): the
+  app log shows the connect completing 0.7s after the scan ended; still
+  connected after 93s.
+- Forced drop (`bluetoothctl disconnect` on the Pi): status showed
+  "reconnecting" at once and was connected again ~8s later.
+- Locally against a fake mount: idle drop detected, reconnect succeeds,
+  no reconnect after a user disconnect, gives up after the time limit.
+
+## 2026-10-07 — The real fix for the mount disconnects: bond the adapter
+
+Reported after the fix above: "still disconnecting, but re-connecting".
+The log showed a drop at 16:30:35, 23s after a scan the Bluetooth page
+started when opened while already connected. So it wasn't only connects
+made mid-scan: *any* scan made BlueZ drop the link ~25-30s later.
+
+- Scan while connected (no other change): dropped 24s after the scan.
+- `bluetoothctl trust` while connected, then scan: dropped 25s after.
+- Watched with `bluetoothctl info` during the drop: the device object is
+  deleted at that moment — BlueZ's temporary-device cleanup
+  (`TemporaryTimeout`, 30s; setting it to 0 would mean "never keep").
+- The earlier "it doesn't bond" conclusion was wrong: the Pi's adapter
+  was `Pairable: no`, and a non-pairable BlueZ pairs without bonding.
+  With `bluetoothctl pairable on`, the same `pair` gave `Bonded: yes`, and
+  a scan while connected no longer dropped anything (50s watched).
+
+Fix: `mount._ensure_bonded`, run on connect when the adapter isn't bonded
+yet (pairable on → scan if BlueZ doesn't know the device → pair with a
+NoInputNoOutput agent → pairable off), plus a single remove-and-re-pair
+retry if a connect with a stored bond fails (adapter reflashed). Connects
+still wait for a running scan, and auto-reconnect stays for other drops.
+
+### Verified live on 192.168.1.35
+
+- From scratch (`bluetoothctl remove`, device unknown to BlueZ), connect
+  through the app: 29s (scan + pair + connect); afterwards `Bonded: yes`,
+  `Connected: yes`, `Pairable: no`.
+- Scan while connected: no drop in 50s.
+- Not exercised: the stale-bond re-pair path (needs the adapter
+  reflashed).
