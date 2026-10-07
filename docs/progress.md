@@ -1191,3 +1191,44 @@ includes `rfkill unblock bluetooth`; the Pi stayed on `TATA_3071`.
 Afterwards the Bluetooth page's list showed `SmartEQ-RJ9` as last used,
 and connecting through the packaged app took 2s, reusing the bond (mount
 at its zero position, RA/Dec read back).
+
+## 2026-10-07 — Mount controls on the live preview
+
+Reported: on a phone you have to scroll between the preview and the
+Mount card to see the frame while moving the mount.
+
+While a mount is connected, the dashboard now overlays the move controls
+on the preview: N/S/E/W buttons (48px, translucent) at the edge
+midpoints, clear of the center and crosshair; the slew speed selector
+top-left; Stop bottom-right. Mount errors also show right under the
+preview. The Mount card is unchanged (and keeps Go to zero and the
+readout); both sets of buttons use the same press-and-hold code, and the
+two speed selectors stay in sync.
+
+### Checked on 192.168.1.35
+
+- Copied `index.html`/`style.css` and restarted the app (Flask caches
+  templates): the served page has the overlay, all 8 direction buttons
+  and both speed selectors; its script passes `node --check`. Reconnected
+  the mount afterwards.
+- Not yet seen on a real phone (no browser on the dev machine): the
+  overlay's look over the stream, and that holding an edge button doesn't
+  scroll the page.
+
+## 2026-10-07 — Mount card removed; everything on the preview
+
+Per the user: drop the separate Mount section and show its details in
+the Focus section, with the zero button at the preview's bottom-left.
+
+- The Mount card (with its own D-pad and speed selector) is gone. Under
+  the preview: the connection line with a Bluetooth link, the state and
+  RA/Dec readout, a one-line hint, and mount errors.
+- Go to zero moved onto the preview as a "Zero" pill, bottom-left
+  (opposite Stop), still confirmed before it slews. Only one copy now.
+- The Bluetooth page's link after connecting now reads "Back to
+  preview".
+
+Checked on 192.168.1.35 after a restart: the served dashboard has no
+Mount card, one overlay with the four directions, speed, Zero and Stop;
+both pages' scripts pass `node --check`; mount reconnected afterwards.
+Still not seen on a real phone.

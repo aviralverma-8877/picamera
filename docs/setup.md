@@ -224,8 +224,11 @@ RS-232 port.
    including a scan). After that it's listed as "Last used" straight away
    and connects in a couple of seconds. If the adapter is reflashed, the
    app notices the stale bond and pairs again by itself.
-3. Back on the dashboard, the Mount card is enabled: slew speed (1x–Max),
-   N/S/E/W hold-to-move buttons, Stop, and Go to zero position.
+3. Back on the dashboard, the mount controls appear on the live preview
+   itself — N/S/E/W at its edges, slew speed top-left, Zero (go to zero
+   position) bottom-left, Stop bottom-right — so you can watch the frame
+   while you move. The mount's state and RA/Dec show just below the
+   preview.
 
 Nothing to set up by hand: the image boots with Bluetooth rfkill-blocked,
 and the app lifts the block itself through the sudoers rule above. The

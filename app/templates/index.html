@@ -74,6 +74,31 @@
         <span class="crosshair-h"></span>
         <span class="crosshair-v"></span>
       </div>
+      <!-- The mount controls again, on the preview itself, so framing on a
+           phone doesn't mean scrolling between the image and the Mount
+           card. At the edges, clear of the center and crosshair. -->
+      <div id="mount-overlay" class="mount-overlay" hidden>
+        <select class="mount-rate-select ov-rate" aria-label="Slew speed">
+          {% for rate in slew_rates %}
+            <option value="{{ loop.index }}">{{ rate }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="ov-dir ov-n" data-dir="n" aria-label="Move north">N</button>
+        <button type="button" class="ov-dir ov-e" data-dir="e" aria-label="Move east">E</button>
+        <button type="button" class="ov-dir ov-w" data-dir="w" aria-label="Move west">W</button>
+        <button type="button" class="ov-dir ov-s" data-dir="s" aria-label="Move south">S</button>
+        <button type="button" class="ov-zero" id="mount-zero" title="Go to zero position">Zero</button>
+        <button type="button" class="ov-stop mount-stop-btn">Stop</button>
+      </div>
+    </div>
+    <p class="hint warning mount-error" hidden></p>
+    <div class="mount-info">
+      <p class="mount-conn">
+        <span id="mount-conn">Checking mount…</span>
+        <a href="{{ url_for('bluetooth_page') }}">Bluetooth</a>
+      </p>
+      <p id="mount-readout" class="mount-readout" hidden></p>
+      <p id="mount-connected-only" class="hint" hidden>Hold N/S/E/W on the preview to move the mount at the speed shown top-left. Zero (bottom-left) slews to the zero position; Stop halts everything, including that slew.</p>
     </div>
 
     <label class="checkbox"><input type="checkbox" id="crosshair-toggle"> Show center crosshair</label>
@@ -84,34 +109,6 @@
     <p class="hint">Zoom crops the sensor itself (not just the preview image) for real extra detail on a small star — useful for picking out a Bahtinov mask's diffraction spikes. Preview only; captures always use the full frame.</p>
 
     <p class="hint">Live preview — pauses automatically while a sequence is running.</p>
-  </section>
-
-  <section class="card" id="mount-card">
-    <div class="card-header">
-      <h2>Mount</h2>
-      <a href="{{ url_for('bluetooth_page') }}" class="button-link">Bluetooth</a>
-    </div>
-    <p id="mount-conn" class="hint">Checking mount…</p>
-    <p id="mount-error" class="hint warning" hidden></p>
-    <fieldset id="mount-controls" class="mount-controls" disabled>
-      <p id="mount-readout" class="mount-readout" hidden></p>
-      <label>Slew speed
-        <select id="mount-rate">
-          {% for rate in slew_rates %}
-            <option value="{{ loop.index }}">{{ rate }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <div class="dpad">
-        <button type="button" class="dpad-n" data-dir="n">N</button>
-        <button type="button" class="dpad-e" data-dir="e">E</button>
-        <button type="button" class="dpad-stop danger" id="mount-stop">Stop</button>
-        <button type="button" class="dpad-w" data-dir="w">W</button>
-        <button type="button" class="dpad-s" data-dir="s">S</button>
-      </div>
-      <p class="hint">Hold a direction to move at the slew speed; release to stop. Stop halts everything, including a go-to-zero slew.</p>
-      <button type="button" id="mount-zero" class="secondary">Go to zero position</button>
-    </fieldset>
   </section>
 
   <section class="card">
@@ -362,17 +359,20 @@
     refreshNetworkStatus();
 
     const mountConn = document.getElementById("mount-conn");
-    const mountError = document.getElementById("mount-error");
-    const mountControls = document.getElementById("mount-controls");
+    const mountConnectedOnly = document.getElementById("mount-connected-only");
+    const mountOverlay = document.getElementById("mount-overlay");
     const mountReadout = document.getElementById("mount-readout");
-    const mountRate = document.getElementById("mount-rate");
+    const mountErrors = document.querySelectorAll(".mount-error");
+    const mountRateSelects = document.querySelectorAll(".mount-rate-select");
     let mountHold = null;            // direction being held, e.g. "n"
     let mountHoldTimer = null;
     let mountMoveInFlight = Promise.resolve();
 
     function showMountError(text) {
-      mountError.textContent = text;
-      mountError.hidden = !text;
+      mountErrors.forEach((el) => {
+        el.textContent = text;
+        el.hidden = !text;
+      });
     }
 
     async function mountPost(url, body) {
@@ -385,11 +385,12 @@
     }
 
     function applyMountStatus(d) {
-      mountControls.disabled = !d.connected;
+      mountOverlay.hidden = !d.connected;
+      mountConnectedOnly.hidden = !d.connected;
       if (!d.connected) {
         mountConn.textContent = d.reconnecting
           ? `Lost the connection to "${d.name}" — reconnecting…`
-          : "No mount connected — connect its Bluetooth adapter to enable the controls.";
+          : "No mount connected — connect its adapter to move it from the preview.";
         mountReadout.hidden = true;
         endMountHold();
         return;
@@ -402,7 +403,9 @@
       mountConn.textContent = `Connected to "${d.name}".`;
       mountReadout.textContent = `${d.state} · ${d.tracking}  —  RA ${d.ra}   Dec ${d.dec}`;
       mountReadout.hidden = false;
-      if (d.rate && document.activeElement !== mountRate) mountRate.value = d.rate;
+      mountRateSelects.forEach((sel) => {
+        if (d.rate && document.activeElement !== sel) sel.value = d.rate;
+      });
     }
 
     async function refreshMountStatus() {
@@ -442,13 +445,13 @@
       const axis = mountHold === "n" || mountHold === "s" ? "dec" : "ra";
       mountHold = null;
       clearInterval(mountHoldTimer);
-      document.querySelectorAll(".dpad button.active").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll("[data-dir].active").forEach((b) => b.classList.remove("active"));
       mountMoveInFlight = mountMoveInFlight.then(() =>
         mountPost("{{ url_for('mount_stop') }}", { axis }).catch((e) => showMountError(e.message))
       );
     }
 
-    document.querySelectorAll(".dpad [data-dir]").forEach((button) => {
+    document.querySelectorAll("[data-dir]").forEach((button) => {
       button.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         button.setPointerCapture(e.pointerId);
@@ -462,20 +465,25 @@
     window.addEventListener("blur", endMountHold);
     document.addEventListener("visibilitychange", () => { if (document.hidden) endMountHold(); });
 
-    document.getElementById("mount-stop").addEventListener("click", () => {
-      endMountHold();
-      mountMoveInFlight = mountMoveInFlight.then(() =>
-        mountPost("{{ url_for('mount_stop') }}", {}).catch((e) => showMountError(e.message))
-      );
+    document.querySelectorAll(".mount-stop-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        endMountHold();
+        mountMoveInFlight = mountMoveInFlight.then(() =>
+          mountPost("{{ url_for('mount_stop') }}", {}).catch((e) => showMountError(e.message))
+        );
+      });
     });
 
-    mountRate.addEventListener("change", async () => {
-      try {
-        await mountPost("{{ url_for('mount_rate') }}", { rate: Number(mountRate.value) });
-        showMountError("");
-      } catch (e) {
-        showMountError(e.message);
-      }
+    mountRateSelects.forEach((sel) => {
+      sel.addEventListener("change", async () => {
+        mountRateSelects.forEach((other) => { other.value = sel.value; });
+        try {
+          await mountPost("{{ url_for('mount_rate') }}", { rate: Number(sel.value) });
+          showMountError("");
+        } catch (e) {
+          showMountError(e.message);
+        }
+      });
     });
 
     document.getElementById("mount-zero").addEventListener("click", async () => {

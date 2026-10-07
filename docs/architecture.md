@@ -288,8 +288,16 @@ packaging/
   `rfkill unblock bluetooth`.
 - **The connection lives in the app, not the browser**: one `MountLink`
   shared by every page, so the Bluetooth page connects it and the
-  dashboard's Mount card (next to the preview, so framing and nudging
-  happen on one screen) uses it. A lock serializes commands, since the
+  dashboard uses it.
+- **The move controls sit on the preview itself**: on a phone the
+  preview fills the screen width, so a separate controls card below it
+  meant scrolling back and forth while framing. While a mount is
+  connected, N/S/E/W buttons are overlaid at the preview's edge
+  midpoints (clear of the center and the crosshair), with the slew speed
+  top-left, Zero (go to zero position, confirmed first) bottom-left and
+  Stop bottom-right. There's no separate Mount card: the connection
+  line, state and RA/Dec readout, and any mount error sit right under the
+  preview in the Focus section. A lock serializes commands, since the
   mount answers one at a time; before each command any stray buffered
   bytes are discarded, so a late reply can never be read as the answer to
   the next command.

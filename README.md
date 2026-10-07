@@ -30,8 +30,9 @@ exposure sequences through a small web UI.
   the hotspot, and says why.
 - **Telescope mount control over Bluetooth** — connect an iOptron mount
   through the ESP32 `SmartEQ-RJ9` adapter from a Bluetooth page, then nudge
-  it from the dashboard right next to the live preview: hold-to-move
-  N/S/E/W buttons, slew speed (1x–Max), Stop, and Go to zero position.
+  it with hold-to-move N/S/E/W buttons laid right on the live preview, so
+  you can watch the frame while it moves; slew speed (1x–Max), Stop, and
+  Go to zero position are on the preview too.
   Moves stop by themselves if the phone drops off mid-press.
 - **Connects like public WiFi** — joining the `AstroCamera` AP pops up a
   "sign in to this network" prompt straight to the dashboard, the same way

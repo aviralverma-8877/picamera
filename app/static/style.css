@@ -376,46 +376,83 @@ button:disabled { opacity: 0.55; }
   font-size: 1rem;
 }
 .button-row > button { flex: 1; }
-.mount-controls {
-  margin: 0;
-  padding: 0;
-  border: none;
-  min-width: 0;
+.mount-info { margin-bottom: 0.75rem; }
+.mount-conn {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #9aa0a6;
 }
-.mount-controls:disabled { opacity: 0.45; }
+.mount-conn a { color: #7fd1ff; text-decoration: none; white-space: nowrap; }
 .mount-readout {
-  margin: 0 0 0.75rem;
+  margin: 0.35rem 0 0;
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
   color: #c9cdd2;
 }
-/* N on top, S at the bottom, E left and W right (the sky seen facing
-   south), Stop in the middle. Big targets: this gets used in the dark. */
-.dpad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-areas:
-    ".    n    ."
-    "e    stop w"
-    ".    s    .";
-  gap: 0.5rem;
-  max-width: 280px;
-  margin: 0.25rem auto 0;
+/* Mount controls laid over the preview (shown while a mount is connected):
+   N/S/E/W at the edge midpoints, speed top-left, Stop bottom-right. The
+   container lets touches through to nothing but the controls themselves. */
+.mount-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
-.dpad button {
+.mount-overlay > * { pointer-events: auto; position: absolute; }
+.ov-dir {
+  width: 48px;
+  height: 48px;
   margin: 0;
-  min-height: 64px;
-  font-size: 1.2rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(22, 24, 29, 0.55);
+  color: #e8e8e8;
+  font-size: 1rem;
   font-weight: 600;
-  /* Press-and-hold: no scrolling, text selection or long-press menu. */
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-.dpad .dpad-n { grid-area: n; }
-.dpad .dpad-s { grid-area: s; }
-.dpad .dpad-e { grid-area: e; }
-.dpad .dpad-w { grid-area: w; }
-.dpad .dpad-stop { grid-area: stop; font-size: 0.95rem; }
-.dpad button.active { background: #7fd1ff; color: #0b0c10; }
+.ov-dir.active { background: #7fd1ff; color: #0b0c10; }
+.ov-n { top: 6px; left: 50%; transform: translateX(-50%); }
+.ov-s { bottom: 6px; left: 50%; transform: translateX(-50%); }
+.ov-e { left: 6px; top: 50%; transform: translateY(-50%); }
+.ov-w { right: 6px; top: 50%; transform: translateY(-50%); }
+.ov-stop {
+  right: 6px;
+  bottom: 6px;
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(192, 57, 43, 0.85);
+  font-size: 0.85rem;
+}
+.ov-zero {
+  left: 6px;
+  bottom: 6px;
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(22, 24, 29, 0.7);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+}
+.ov-rate {
+  top: 6px;
+  left: 6px;
+  width: auto;
+  margin: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(22, 24, 29, 0.7);
+  font-size: 0.85rem;
+}
