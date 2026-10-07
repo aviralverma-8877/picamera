@@ -1243,3 +1243,16 @@ Still not seen on a real phone.
 
 Deployed to 192.168.1.35 and restarted; served page checked (one
 Bluetooth link, script passes `node --check`); mount reconnected.
+
+### Re-published as v1.0.5 (per user: update the latest release, no new one)
+
+Moved the `v1.0.5` tag from `a5b897a` to `c739c7b` (preview overlay,
+Zero button, sticky nav bar) and force-pushed it; the release workflow
+swapped the new `.deb` into the existing v1.0.5 release and re-published
+the apt repository. As with the v1.0.2 re-publish, devices that already
+had the earlier 1.0.5 won't get this through `apt upgrade` (same
+version): they need `sudo apt install --reinstall astro-pi-cam`. Done on
+the test Pi: it pulled the new build (its sha256 matched the release
+asset), both services active, the installed CSS has the sticky header;
+mount reconnected afterwards. The release notes are still the
+auto-generated ones (see above).
