@@ -1,15 +1,15 @@
-Date: Wed, 07 Oct 2026 11:13:18 +0000
+Date: Wed, 07 Oct 2026 11:27:22 +0000
 Label: Astro Pi Camera
 Origin: astro-pi-cam
 MD5Sum:
- be2f809e353b2f501dab29486cc88780             5162 Packages
- 3da6577485372cfaabc6bf778b4b59ff             1518 Packages.gz
+ ac2c0b18212b97d8ed11e5b5a29c6dd2             5162 Packages
+ add66de91e0dd60b6c0c0b64f4c2c936             1517 Packages.gz
 SHA1:
- 2dd7dea88f7663b721b210cb3ed9b99260f6b2ed             5162 Packages
- 8d3917deb818bf210bfb8fa959680a630e48f680             1518 Packages.gz
+ 9bd8ef7fdcf69b424f099c8a706f7be719a46f06             5162 Packages
+ c2612a7c20ca2b87597860dcfb5952f96d66f925             1517 Packages.gz
 SHA256:
- 6b293bb3762205051a375938ceea15edc85f5fc59a98b7463258bdde41882e91             5162 Packages
- 2f7cb4b2c386bb74d504d632b069a1d068b6da71d5258456bb4e6126fd861952             1518 Packages.gz
+ c1e1fb16996a01178b949f4cb86e102f0d15d96272cfcdfaf65baa712c5c5808             5162 Packages
+ 3e936ae0d137a5b38c12f0ce7c4cfda8ab2eb78260735d8fb2485dff5c2db79b             1517 Packages.gz
 SHA512:
- 00e0e735838d4a91167a6de7f5c02c066d20c8b4fef344f571f6893f2a7e14af3ba80586854ccacdf64f2539f4b35c867c58326782af13870e5d92c0fb6f5b02             5162 Packages
- 99ebba2eded070987852a6d7d067915b0eb3e89501626d8e2bd8d67f27a7bddb35bd71082e90d7176b248b0ec235b104a21c6b8ccd9c24dbe1f334b0ca11b250             1518 Packages.gz
+ 754018b8c4312b0aa74bb74560eb9ca1b9a0f0bee2464053c85ab17e5f430df747a6fed08585bdd4d6ea0b098ae6affa990656d951d22ec3b47a772c6bb2f969             5162 Packages
+ 04f773da0c2c97a6083fe4486638773c141f26bdd59ae5fe30d6d8a7bb66315d832266d27cd4a083e1cd7bee28ef74a97a5d570be6b4c3d3bc86234a3480f44d             1517 Packages.gz
