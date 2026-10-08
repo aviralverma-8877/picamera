@@ -1356,3 +1356,12 @@ because of how the camera is mounted.
   afterwards. Page script passes `node --check`; mount reconnected.
 - Not done: calibrating against the actual image on a phone (needs
   someone watching the preview while holding the buttons).
+
+### Re-published v1.0.5 with re-mappable buttons
+
+Committed the button re-mapping, added it to
+`docs/release-notes/v1.0.5.md`, moved `v1.0.5` to the new commit; the
+workflow succeeded and the release page shows the updated notes. The
+test Pi reinstalled the new build from apt (sha256 matched the release
+asset): both services active, the orientation switches installed, and
+the saved orientation file kept across the reinstall; mount reconnected.
