@@ -80,6 +80,7 @@ def index():
         status=status,
         iso_options=config.ISO_SELECT_OPTIONS,
         slew_rates=mount_link.SLEW_RATES,
+        mount_orientation=mount_link.load_orientation(),
         min_zoom=config.MIN_ZOOM,
         max_zoom=config.MAX_ZOOM,
         existing_sessions=_list_session_names(),
@@ -613,6 +614,14 @@ def mount_rate():
     except (TypeError, ValueError):
         return "Invalid slew rate", 400
     return _mount_action(lambda: mount.set_rate(rate))
+
+
+@app.route("/mount/orientation", methods=["POST"])
+def mount_orientation():
+    try:
+        return jsonify(mount_link.save_orientation(request.get_json(silent=True) or {}))
+    except OSError as exc:
+        return f"Couldn't save: {exc}", 500
 
 
 @app.route("/mount/track", methods=["POST"])

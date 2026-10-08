@@ -347,6 +347,20 @@ packaging/
   lowered the reported RA, i.e. turned the scope toward the western sky,
   so if E/W feel reversed in the field, that's the mount's convention.
 
+- **The edge buttons move the image, and the user maps them onto the
+  mount**: the camera can sit on the mount at any angle, so "N" at the
+  top of the preview often moved the image sideways or backwards. The
+  four buttons are now positions (up/down/left/right: "move the image
+  toward this edge"), and the page works out which mount direction each
+  sends from three switches — swap the axes, reverse up/down, reverse
+  left/right — which between them cover all 8 orientations (each 90°
+  turn, mirrored or not; every combination checked to give a valid,
+  distinct layout). Each button's label shows the direction it currently
+  sends. The setting describes the rig, not the phone, so it's stored on
+  the Pi (`app/mount-orientation.json`, `POST /mount/orientation`) and
+  shared by every phone. It also records whether "Rotate 180°" was on
+  when saved; toggling that since turns the image upside down, so the
+  page reverses both axes to keep the buttons right.
 - **The dashboard keeps the phone's screen on, mostly via a silent
   looping video**: a phone that auto-locks mid-sequence or mid-tracking
   hides the preview and status. The Screen Wake Lock API would be the

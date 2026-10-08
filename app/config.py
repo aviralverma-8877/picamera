@@ -82,3 +82,6 @@ RFKILL = "/usr/sbin/rfkill"
 # The last mount adapter connected to, so it can be reconnected in one tap
 # without scanning (it stays reachable by address).
 MOUNT_DEVICE_FILE = APP_DIR / "mount-device.json"
+# How the preview's direction buttons map onto mount moves, for however
+# the camera happens to sit on the mount (see mount.load_orientation).
+MOUNT_ORIENTATION_FILE = APP_DIR / "mount-orientation.json"

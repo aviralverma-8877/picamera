@@ -115,6 +115,29 @@ def _save_last_device(address, name):
 _scan_lock = threading.Lock()
 
 
+# The preview's edge buttons move the *image* up/down/left/right; which
+# mount direction that takes depends on how the camera is turned on the
+# mount. Three switches cover every orientation (any 90-degree turn, either
+# mirror): swap the axes, then reverse either one. `flip` records whether
+# the camera's own "Rotate 180°" was on when this was set — the page
+# corrects for it being toggled since, so the buttons stay right.
+_ORIENTATION_KEYS = ("swap", "reverse_v", "reverse_h", "flip")
+
+
+def load_orientation():
+    try:
+        data = json.loads(config.MOUNT_ORIENTATION_FILE.read_text())
+        return {k: bool(data.get(k)) for k in _ORIENTATION_KEYS}
+    except (OSError, ValueError, AttributeError):
+        return {k: False for k in _ORIENTATION_KEYS}
+
+
+def save_orientation(data):
+    orientation = {k: bool(data.get(k)) for k in _ORIENTATION_KEYS}
+    config.MOUNT_ORIENTATION_FILE.write_text(json.dumps(orientation))
+    return orientation
+
+
 def _bonded(address):
     try:
         out = _run(["bluetoothctl", "info", address], timeout=5).stdout

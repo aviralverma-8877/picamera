@@ -7,3 +7,4 @@ app/captures/
 Thumbs.db
 *.deb
 app/mount-device.json
+app/mount-orientation.json

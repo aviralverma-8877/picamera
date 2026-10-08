@@ -227,7 +227,12 @@ RS-232 port.
 3. Back on the dashboard, the mount controls appear on the live preview
    itself — N/S/E/W at its edges, slew speed top-left, Track top-right,
    Zero (go to zero position) bottom-left, Stop bottom-right — so you can
-   watch the frame while you move. Once a star is framed, tap Track: the
+   watch the frame while you move. Each button should move the image
+   toward its own edge; if one doesn't (it depends on how the camera sits
+   on the mount), open "Button directions" under the preview, hold a
+   button, watch which way a star moves, and tick the swap/reverse boxes
+   until they all match — it's saved on the camera, so once per rig, for
+   every phone. Once a star is framed, tap Track: the
    mount turns with the sky to keep it in frame (the button turns green,
    "Tracking"). Nudging keeps tracking on; Stop halts moves and slews but
    not tracking — tap Tracking again to stop it. The mount's state and RA/Dec show just below the

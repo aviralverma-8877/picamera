@@ -383,6 +383,9 @@ button:disabled { opacity: 0.55; }
 }
 .button-row > button { flex: 1; }
 .mount-info { margin-bottom: 0.75rem; }
+.mount-orient { margin-top: 0.5rem; font-size: 0.9rem; }
+.mount-orient summary { color: #7fd1ff; cursor: pointer; }
+.mount-orient label.checkbox { margin: 0.5rem 0 0; }
 .mount-conn {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
@@ -420,10 +423,10 @@ button:disabled { opacity: 0.55; }
   -webkit-touch-callout: none;
 }
 .ov-dir.active { background: #7fd1ff; color: #0b0c10; }
-.ov-n { top: 6px; left: 50%; transform: translateX(-50%); }
-.ov-s { bottom: 6px; left: 50%; transform: translateX(-50%); }
-.ov-e { left: 6px; top: 50%; transform: translateY(-50%); }
-.ov-w { right: 6px; top: 50%; transform: translateY(-50%); }
+.ov-up { top: 6px; left: 50%; transform: translateX(-50%); }
+.ov-down { bottom: 6px; left: 50%; transform: translateX(-50%); }
+.ov-left { left: 6px; top: 50%; transform: translateY(-50%); }
+.ov-right { right: 6px; top: 50%; transform: translateY(-50%); }
 .ov-stop {
   right: 6px;
   bottom: 6px;
