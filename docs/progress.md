@@ -1329,3 +1329,30 @@ and the rebuilt `.deb`. The test Pi pulled it with `apt install
 --reinstall astro-pi-cam` (sha256 matched the release asset): both
 services active, `keep-awake.mp4` and the Track button installed; mount
 reconnected afterwards.
+
+## 2026-10-08 — Re-mappable direction buttons
+
+Reported: the N/S/E/W buttons don't move the preview the way they point,
+because of how the camera is mounted.
+
+- The edge buttons are now image directions (`data-pos` up/down/left/
+  right) and the page maps them to mount directions with three switches
+  under the preview ("Button directions"): swap up/down with left/right,
+  reverse up/down, reverse left/right. Labels show the mount direction
+  each button currently sends.
+- Saved on the Pi (`app/mount-orientation.json`, gitignored) via
+  `POST /mount/orientation`, rendered into the dashboard; also records the
+  "Rotate 180°" state so toggling it later keeps the buttons right.
+
+### Checked
+
+- Mapping functions, taken from the template and run in Node: all 8
+  switch combinations give 8 distinct layouts, each using N/S/E/W once
+  with opposites on opposite edges; with Rotate 180° toggled each layout
+  inverts exactly (up↔down, left↔right); saved and viewed both rotated →
+  no correction.
+- On 192.168.1.35: default in the page, save (unknown keys dropped),
+  reload shows it, file on the Pi matches; reset back to default
+  afterwards. Page script passes `node --check`; mount reconnected.
+- Not done: calibrating against the actual image on a phone (needs
+  someone watching the preview while holding the buttons).
